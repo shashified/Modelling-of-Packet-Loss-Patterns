@@ -39,8 +39,6 @@ The trouble is that the loss rate only tells you how many packets were lost, not
 
 We set out to measure how badly the independence assumption breaks, which standard tests can detect it, and what it does to the interval estimates people report for the loss rate. The project has two phases. This report covers Phase 1, a simulation study. Because we chose the true parameters of each network ourselves, we can check every estimate and every test against the right answer before trusting the same code on real data. Phase 2 will run that code on real captures.
 
-Concretely, we fit two models to the per-second loss counts (Poisson and Negative Binomial) and two to the gaps between losses (exponential and a two-phase mixture). We test independence with a runs test and a Markov-chain likelihood-ratio test, and we estimate burst behaviour with a Bayesian model. Finally, we use simulation to check how often the usual 95\% interval actually works, and how long a real capture needs to be.
-
 The rest of the report runs as follows. Section~II gives the background, Section~III describes the loss model and how the data were generated, Section~IV explains the statistical methods, and Section~V presents the results. Section~VI discusses what the results mean and where the study falls short, and Section~VII sums up.
 
 \section{Background}
