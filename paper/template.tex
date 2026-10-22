@@ -2,9 +2,8 @@
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage[section]{placeins}
-\usepackage{stfloats}
 \usepackage{array}
+\usepackage{stfloats}
 \usepackage[hidelinks]{hyperref}
 \graphicspath{{figures/}}
 \renewcommand{\arraystretch}{1.12}
@@ -16,6 +15,18 @@
 \setcounter{topnumber}{3}
 \setcounter{dbltopnumber}{2}
 
+\usepackage{etoolbox}
+\makeatletter
+\newcommand{\nodashpatch}[1]{%
+  \patchcmd{#1}{\textit{\abstractname}---}{\textit{\abstractname}:\ }{}{}%
+  \patchcmd{#1}{\textit{\abstractname}---}{\textit{\abstractname}:\ }{}{}%
+  \patchcmd{#1}{\textbf{\abstractname}---}{\textbf{\abstractname}:\ }{}{}%
+  \patchcmd{#1}{\textit{\IEEEkeywordsname}---}{\textit{\IEEEkeywordsname}:\ }{}{}%
+  \patchcmd{#1}{\textit{\IEEEkeywordsname}---}{\textit{\IEEEkeywordsname}:\ }{}{}%
+  \patchcmd{#1}{\textbf{\IEEEkeywordsname}---}{\textbf{\IEEEkeywordsname}:\ }{}{}}
+\nodashpatch{\abstract}\nodashpatch{\IEEEkeywords}
+\makeatother
+
 \begin{document}
 
 \title{Statistical Modelling of Packet-Loss Patterns in Computer Networks: Distribution Fitting, Burstiness Testing and Bayesian Estimation}
@@ -25,7 +36,7 @@
 \maketitle
 
 \begin{abstract}
-Loss rate is normally reported as one number, and the easiest models treat every lost packet as if it had nothing to do with the packets around it. Under that view, losses per second are Poisson and the waiting time between losses is exponential. We wanted to know what happens to these results when losses come in bursts instead. To find out, we simulated <<n_scen>> networks (wired broadband, campus Wi-Fi and a mobile hotspot) using a two-state Gilbert-Elliott model, with each one sending <<rate>> packets a second for <<duration_h>> hour, or <<packets>> packets in all. On these traces we fitted models for the counts and for the gaps, tested whether neighbouring packets are independent, and estimated loss rates with a Beta-Binomial model. Independence broke down on all three. The variance of the per-second count came out at <<list_D>> times the mean (Poisson would give 1), and once a packet was lost, the next one was <<amp_lo>> to <<amp_hi>> times more likely to go too. The practical cost showed up in the error bars. In <<cov_reps>> simulated captures, the usual 95\% interval for the loss rate held the true value only <<covN_lo>> to <<covN_hi>> of the time. Cutting the sample size down by a design effect brought that back up to <<covA_lo>> to <<covA_hi>>. A power study suggests recording at least ten minutes on each network once we start taking real measurements.
+The loss rate of a network is usually reported as a single number, and the simplest models assume that each packet is lost independently of the others. If that held, the number of losses per second would be Poisson and the gap from one loss to the next would be exponential. In this study we check how much of this survives when losses arrive in bursts. Three networks (wired broadband, campus Wi-Fi and a mobile hotspot) were simulated with a two-state Gilbert-Elliott model, each sending <<rate>> packets per second for <<duration_h>> hour, which comes to <<packets>> packets per network. We fitted models for the counts and for the waiting times, tested whether neighbouring packets are independent, and estimated the loss rates with a Bayesian Beta-Binomial model. Independence did not hold on any of the <<n_scen>> networks. The variance of the per-second loss count was <<list_D>> times the mean, where a Poisson model gives 1, and after a single loss the next packet was <<amp_lo>> to <<amp_hi>> times more likely to be lost. This shows up directly in the error bars. Over <<cov_reps>> simulated captures, the standard 95\% interval for the loss rate contained the true value in only <<covN_lo>> to <<covN_hi>> of cases. Reducing the sample size by a design effect raised coverage to between <<covA_lo>> and <<covA_hi>>. A power study suggests recording at least ten minutes on each network once we move on to real measurements.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -33,34 +44,34 @@ packet loss, Gilbert-Elliott model, burstiness, goodness of fit, Bayesian estima
 \end{IEEEkeywords}
 
 \section{Introduction}
-Most of us have run into packet loss without giving it a name. A video call on bad Wi-Fi stalls for a second, a word goes missing from the audio, and then things pick up again. What is happening underneath is simple enough. The app sends small packets at a steady rate and a few of them never make it. The fraction that goes missing is the loss rate. It shows up in service agreements, and it is what protocol designers look at when they tune retransmission timers or pick how much error correction to add.
+Most people have run into packet loss without calling it that. A video call on poor Wi-Fi freezes for a second, or a word drops out of the audio, and then the call picks up again. Underneath, the application is sending small packets at a fixed rate, and a few of them never reach the other end. The fraction that goes missing is called the loss rate. It is the figure written into service agreements, and protocol designers rely on it when they choose retransmission timers or decide how much error correction a stream should carry.
 
-The catch is that a loss rate says how many packets were lost but not when. Lose ten packets scattered across a minute and the decoder quietly fills each hole; nobody notices. Lose ten in a row and the picture freezes. The standard textbook move is to assume that every packet is lost on its own, with the same small probability $p$. It is a convenient assumption because it hands you two clean results: the number of losses in a short window is Binomial (so close to Poisson), and the time between losses is exponential. If losses cluster, neither result holds, and any error bars built on top of them are off as well.
+What the loss rate does not show is how the losses are spread out in time. If ten packets are lost at scattered points over a minute, the decoder can hide each gap and the user hardly notices. Ten losses in a row produce an obvious freeze. Textbook models usually sidestep this by assuming that every packet is lost independently with the same small probability $p$. The assumption is convenient: it makes the number of losses in a short window Binomial, and so close to Poisson, and the time between losses exponential. Once losses start to cluster, neither result is correct, and the error bars worked out from them are wrong too.
 
-So we asked three things. How far does independence actually break? Which of the usual tests notice? And what happens to the interval people quote for the loss rate? The work is planned in two phases, and this report is about the first one, a simulation study. Since we picked every network's true parameters ourselves, we always know the right answer, which lets us check each estimate and each test before we point the same code at real data in Phase 2.
+Our aim was to find out how badly independence fails, which standard tests pick up the failure, and what it does to the interval estimates usually reported for the loss rate. The work is split into two phases, and this report covers Phase 1, a simulation study. Because we set the true parameters of each network ourselves, we can compare every estimate and test with the correct answer before the same code is used on real data. Phase 2 will apply that code to real captures.
 
-Section~II gives some background. Section~III describes the loss model and how we generated the data, Section~IV goes through the statistical methods, and Section~V has the results. We discuss what they mean, and where the study falls short, in Section~VI, and wrap up in Section~VII.
+The report is organised as follows. Section~II gives some background, Section~III sets out the loss model and how the data were generated, Section~IV describes the statistical methods and Section~V reports the results. Section~VI discusses what the results mean and where the study is limited, and Section~VII concludes.
 
 \section{Background}
-Using a hidden two-state chain for bursty errors is an old idea. E.~N.~Gilbert proposed it in 1960 for errors on telephone lines, and E.~O.~Elliott generalised it in 1963 so that either state could produce errors. More than sixty years later, the Gilbert-Elliott model is still where most people start when they want to describe bursty loss.
+Modelling bursty errors with a hidden two-state chain goes back to E.~N.~Gilbert, who used it for errors on telephone lines in 1960. In 1963 E.~O.~Elliott extended the model so that errors could occur in either state. The Gilbert-Elliott model that came out of this is still the usual starting point for bursty loss.
 
-Nor is it news that Internet losses are not independent. Measurement work in the 1990s found that probe packets sent close together were often lost together, that TCP transfers lost packets in correlated episodes, and that Markov chains did a decent job of describing loss timing in multicast traces. Later studies fitted Gilbert models to voice traffic and tied burst length to how bad a call sounds.
+It has also been known for many years that Internet losses are not independent. Measurement studies in the 1990s showed that probe packets sent close together were often lost together, and that losses in TCP transfers came in correlated episodes. The timing of loss in multicast traces could be described reasonably well with Markov chains. Later studies fitted Gilbert models to voice traffic and related the length of a loss burst to how poor a call sounds.
 
-That earlier work mostly set out to describe the loss process. We come at it from the statistics side instead. Which standard tests pick up the dependence, how much data do they need, and how far off are the usual intervals if you ignore it? For that last question we borrowed the design effect from survey sampling. There it is used when people are sampled in clusters, say whole households, rather than one by one, which turns out to be a close match for packets lost in bursts.
+Most of this earlier work sets out to describe the loss process. Our interest is more statistical. We want to know which standard tests detect the dependence, how much data they need before they do, and how far ordinary interval estimates drift from the truth when the dependence is ignored. For the last of these we use the design effect from survey sampling, where it corrects for people being sampled in clusters instead of one at a time.
 
 \section{Loss Model and Data}
 \subsection{The Gilbert-Elliott Channel}
-It helps to think of the network as having two moods, Good (G) and Bad (B). We never see the mood itself, only what it does to the packets. Before each packet the channel can switch: Good to Bad with probability $p$, Bad to Good with probability $r$. In Good, a packet is lost with a small probability $h_G$. In Bad, the loss probability $h_B$ is much higher. Over a long run, the channel has to enter Bad as often as it leaves, and that balance gives the share of time spent in Bad and, from it, the overall loss rate:
+We treat the network as being in one of two hidden states, Good (G) or Bad (B). We cannot observe the state itself, only what it does to the packets. Before each packet, the channel switches from Good to Bad with probability $p$ and from Bad back to Good with probability $r$. In the Good state a packet is lost with a small probability $h_G$; in the Bad state the probability $h_B$ is much larger. Over a long run, the flow into the Bad state has to equal the flow out of it. This gives the share of time spent in Bad, and from it the overall loss rate:
 \begin{equation}
 \pi_B=\frac{p}{p+r},\qquad P(\text{loss})=(1-\pi_B)\,h_G+\pi_B\,h_B .
 \label{eq:ge}
 \end{equation}
-How long the channel stays in a state is geometric, with an average of $1/p$ packets in Good and $1/r$ in Bad. A burst is just what happens when the channel drops into Bad for a handful of packets.
+The number of packets spent in a state before leaving it is geometric, with a mean of $1/p$ packets for Good and $1/r$ for Bad. A burst of losses happens whenever the channel drops into the Bad state for a few packets.
 
 \subsection{Scenarios and Sampling}
-Table~\ref{tab:params} gives the parameters of our <<n_scen>> networks. We chose them to cover a low, a middle and a high loss rate, and we let the Bad spells get longer as the network gets worse, since that is roughly what you would expect on a real link. Every network sends <<rate>> packets a second, one every <<spacing_ms>>~ms, which is about what a voice call does, and we run each for <<duration_s>>~s. That works out to <<packets>> packets per network and <<packets_total>> overall. All the randomness comes from one seed, <<seed>>, so rerunning the code gives back exactly the numbers in this report.
+Table~\ref{tab:params} lists the parameters for the <<n_scen>> networks. We chose them to give a low, a medium and a high loss rate, with longer Bad spells on the worse networks. Every network sends a constant <<rate>> packets per second, one every <<spacing_ms>>~ms, which is close to the rate of a voice call. Each run lasts <<duration_s>>~s, so there are <<packets>> packets per network and <<packets_total>> overall. All random numbers come from the seed <<seed>>, so anyone rerunning the code gets exactly the numbers in this report.
 
-\begin{table}[!htbp]
+\begin{table}[!t]
 \caption{Scenario parameters and the true loss rate they imply}
 \label{tab:params}
 \centering
@@ -78,95 +89,96 @@ Network & $p$ & $r$ & $h_G$ & $h_B$ & $\pi_B$ & Bad spell & True loss \\
 \end{table}
 
 \subsection{Simulation}
-The obvious way to simulate the chain is to step it forward one packet at a time. That works, but it is slow. What we do instead is draw the length of each Good or Bad stay straight from the geometric distribution, place the stays one after another, and only then go through the packets and decide which were lost, using the loss probability of whichever state each packet landed in. The process is exactly the same; it just runs much faster. From every trace we take out four things: the loss count in each <<window_s>>-s window (<<windows>> per network), the gaps between losses, the burst lengths (runs of back-to-back losses), and how often a delivered (N) or a lost (L) packet is followed by each kind. Fig.~\ref{fig:timeline} plots the first few minutes. You do not need any statistics to see that Wi-Fi and mobile losses come in clumps.
+The chain could be simulated by stepping forward one packet at a time, but that is slow. Instead, we draw the length of each stay in Good or Bad directly from the geometric distribution and place the stays one after another. Then, for every packet, we decide whether it is lost using the loss probability of the state it falls in. The process is the same, just far quicker to generate. We take four things from each trace: the number of losses in each <<window_s>>-s window (<<windows>> counts per network), the gaps between successive losses, the lengths of bursts (runs of consecutive losses), and how often a delivered (N) or lost (L) packet is followed by each type of packet. Fig.~\ref{fig:timeline} plots the first few minutes of each trace. On Wi-Fi and the mobile hotspot the clumping can already be seen by eye.
 
-\begin{figure}[!htbp]
+\begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{fig1_loss_timeline.png}
-\caption{Losses per second over the first five minutes of each simulated trace. On Wi-Fi and the mobile hotspot, losses arrive in clusters rather than one at a time.}
+\caption{Losses per second during the first five minutes of each simulated trace. On Wi-Fi and the mobile hotspot the losses come in clusters instead of one at a time.}
 \label{fig:timeline}
 \end{figure}
 
 \section{Methodology}
 \subsection{Fitting the Distributions}
-For the per-window loss counts $x_1,\dots,x_n$, the natural first model is a Poisson, and its maximum-likelihood estimate is just the average count, $\hat\lambda=\bar x$. The natural second model is the Negative Binomial:
+For the per-window loss counts $x_1,\dots,x_n$, the first model we fit is the Poisson distribution, whose maximum-likelihood estimate is simply the mean count, $\hat\lambda=\bar x$. The natural alternative is the Negative Binomial:
 \begin{align}
 P(X=k)&=\binom{k+r_{\!NB}-1}{k}q^{r_{\!NB}}(1-q)^k,\\
 \operatorname{Var}(X)&=\mu+\mu^2/r_{\!NB} .
 \end{align}
-A handy way to think of the Negative Binomial is as a Poisson whose rate does not sit still, which is what you get when a network keeps switching between good and bad stretches. The $\mu^2/r_{\!NB}$ term is what lets the variance climb above the mean, something a Poisson simply cannot do. We fit it by fixing the mean at $\bar x$ and searching over $r_{\!NB}$ for the highest likelihood.
+The Negative Binomial can be thought of as a Poisson whose rate changes over time, which is what a network moving between good and bad periods produces. The extra term $\mu^2/r_{\!NB}$ lets the variance exceed the mean, something the Poisson cannot do. We fit it by fixing the mean at $\bar x$ and searching for the $r_{\!NB}$ that maximises the likelihood.
 
-For the gaps between losses, the exponential is the natural first model, with $\hat\lambda=1/\bar t$. Our alternative mixes two exponentials together, which is known as a two-phase hyperexponential:
+For the gaps between losses we begin with the exponential distribution, with $\hat\lambda=1/\bar t$, and compare it with a mixture of two exponentials known as the two-phase hyperexponential:
 \begin{equation}
 f(t)=w\lambda_1e^{-\lambda_1t}+(1-w)\lambda_2e^{-\lambda_2t}.
 \end{equation}
-The thinking behind it is that gaps come in two kinds. Short gaps, with the fast rate $\lambda_1$, fall inside a burst. Long gaps, with the slow rate $\lambda_2$, are the quiet stretches between bursts. The problem is that no gap comes labelled, so we fit the mixture with the Expectation-Maximisation (EM) algorithm. Each round has two steps: first estimate, for every gap, how likely it is to be a short one; then refit $w$, $\lambda_1$ and $\lambda_2$ with those likelihoods as weights. We keep going until the fit stops getting better. Models are compared using the Akaike Information Criterion, $\text{AIC}=2k-2\ln L$. It rewards a good fit but charges a penalty for each extra parameter, and the lower score wins.
+The idea behind the mixture is that gaps come in two types. Short gaps, with the fast rate $\lambda_1$, occur within a burst. Long gaps, with the slow rate $\lambda_2$, occur between bursts. We never know which type a particular gap is, so we fit the mixture with the Expectation-Maximisation (EM) algorithm. In each iteration the E-step works out the probability that each gap is a short one, and the M-step updates $w$, $\lambda_1$ and $\lambda_2$ with these probabilities as weights. We stop once the fit no longer improves. Models are compared with the Akaike Information Criterion, $\text{AIC}=2k-2\ln L$. It rewards a good fit but adds a penalty for each extra parameter, so a lower value means a better model.
 
 \subsection{Goodness of Fit}
-For the count models, we line up how many windows actually had each count against how many the model predicts and use the Pearson statistic $\chi^2=\sum_i (O_i-E_i)^2/E_i$. The test gets shaky when expected counts are tiny, which happens in the tail, so we merge tail bins until every expected count is at least 5. Degrees of freedom are the number of bins, less one, less the number of fitted parameters. We also run the index-of-dispersion test. For Poisson counts, $(n-1)s^2/\bar x$ follows $\chi^2_{n-1}$, so a variance well above the mean shows up as a huge statistic.
+We check the count models by comparing the observed number of windows with each count against the number the model expects, using the Pearson statistic $\chi^2=\sum_i (O_i-E_i)^2/E_i$. The test is unreliable when expected counts in the tail are small, so tail bins are merged until every expected count is at least 5. The degrees of freedom are the number of bins, minus one, minus the number of fitted parameters. We also apply the index-of-dispersion test. If the counts are Poisson, $(n-1)s^2/\bar x$ follows a $\chi^2_{n-1}$ distribution, so a variance well above the mean gives a very large value of the statistic.
 
-For the gaps we use the Kolmogorov-Smirnov (KS) distance $D=\sup_t|F_n(t)-F(t)|$, the biggest vertical gap between the data's cumulative curve and the model's. There is a trap here that is easy to miss. The usual KS tables assume the model was fixed before you looked at the data. We estimate the rate from the very data we are testing, which makes the fit look better than it is and the p-value too large. Our fix is a parametric bootstrap: simulate a fake data set from the fitted model, refit it, note its $D$, and repeat, <<n_boot>> times for the exponential and <<n_boot_mix>> for the mixture. That shows how big $D$ normally gets when the model really is right.
+For the gaps we use the Kolmogorov-Smirnov (KS) distance $D=\sup_t|F_n(t)-F(t)|$, the largest vertical distance between the cumulative curve of the data and that of the model. One complication is that the standard KS tables assume the model was fixed before the data were seen. Here the rate is estimated from the same data, which makes the fit look better than it is and leaves the textbook p-value too large. We get the p-value from a parametric bootstrap instead. A synthetic data set is simulated from the fitted model, the model is refitted, and the new $D$ is recorded. Doing this <<n_boot>> times for the exponential and <<n_boot_mix>> times for the mixture shows the range of $D$ to expect if the model were in fact correct.
 
 \subsection{Testing Independence}
-The Wald-Wolfowitz runs test treats the trace as a string of 0s and 1s (delivered or lost) and counts the runs $R$, the unbroken stretches of the same outcome. With $n_1$ losses and $n_0$ deliveries, independence predicts
+The Wald-Wolfowitz runs test works on the 0/1 sequence of delivered and lost packets and counts the number of runs $R$, a run being a stretch of identical outcomes. With $n_1$ losses and $n_0$ deliveries, independence gives
 \begin{equation}
 E[R]=\frac{2n_1n_0}{n}+1,\quad \operatorname{Var}(R)=\frac{2n_1n_0(2n_1n_0-n)}{n^2(n-1)} .
 \end{equation}
-When losses stick together, the string flips between lost and delivered less often than chance would, so $R$ comes out low.
+When losses tend to occur together, the sequence switches between lost and delivered less often than it would by chance, and $R$ ends up smaller than expected.
 
-The Markov-chain test gets at the question more directly. Does what happened to one packet change the odds for the next? Under $H_0$, no: every packet has the same loss probability. Under $H_1$, yes: there is one probability after a delivered packet, $a=P(L\mid N)$, and another after a lost one, $b=P(L\mid L)$. Writing $n_{xy}$ for the number of times outcome $x$ is followed by outcome $y$,
+The Markov-chain test asks the question more directly: does the outcome for one packet depend on the packet before it? Under $H_0$ all packets share a single loss probability. Under $H_1$ there are two, $a=P(L\mid N)$ after a delivered packet and $b=P(L\mid L)$ after a lost one. Writing $n_{xy}$ for the number of times outcome $x$ is followed by outcome $y$,
 \begin{equation}
 \hat a=\frac{n_{NL}}{n_{NN}+n_{NL}},\qquad \hat b=\frac{n_{LL}}{n_{LN}+n_{LL}},
 \end{equation}
 \begin{equation}
 G^2=2(\ln L_1-\ln L_0).
 \end{equation}
-Because $H_1$ has one parameter more than $H_0$, Wilks' theorem tells us $G^2$ is roughly $\chi^2_1$ when $H_0$ holds. The two estimates are worth keeping for their own sake, too. The ratio $b/a$ says how much a loss raises the odds of another, and $1/(1-b)$ is the average burst length.
+Because $H_1$ has one parameter more than $H_0$, Wilks' theorem says that $G^2$ is approximately $\chi^2_1$ when $H_0$ holds. The two estimates are useful on their own as well. The ratio $b/a$ measures how much a loss raises the chance of the next loss, and $1/(1-b)$ gives the mean burst length.
 
-To compare the three networks we stuck to rank-based tests. The counts are mostly zeros and heavily skewed, so anything that assumes normality would be on thin ice. Kruskal-Wallis compares all three together; pairwise Mann-Whitney tests compare them two at a time, with a Bonferroni correction so that running three tests does not quietly push up the false-alarm rate. A $\chi^2$ test of homogeneity on the lost and delivered totals checks whether the loss proportion is the same on every network. All tests use $\alpha=<<alpha>>$.
+The three networks are compared with rank-based tests, since the counts are mostly zero, strongly skewed and far from normal. The Kruskal-Wallis test compares all three networks together. Pairwise Mann-Whitney tests compare them two at a time, with a Bonferroni correction so that running three tests does not push up the false-alarm rate. A $\chi^2$ test of homogeneity on the totals of lost and delivered packets checks whether the loss proportion is the same on every network. All tests use $\alpha=<<alpha>>$.
 
 \subsection{Bayesian Estimation}
-For the loss rate itself we went Bayesian. We start from a flat $\text{Beta}(1,1)$ prior, meaning that before seeing any data we treat every loss rate between 0 and 1 as equally likely. After $k$ losses in $n$ packets the posterior is $\text{Beta}(1+k,\,1+n-k)$, so in practice we just add the observed losses and deliveries to the prior. We report the posterior mean with a 95\% credible interval, and for <<seq_label>> we also show how the posterior tightens as traffic comes in. To check that the networks really are ranked by loss rate, we draw <<ord_draws>> values from each posterior and count how often Wired $<$ Wi-Fi $<$ Mobile comes out.
+We estimate the loss rate itself the Bayesian way. The prior is a flat $\text{Beta}(1,1)$, which treats every loss rate between 0 and 1 as equally likely before any data are seen. After $k$ losses in $n$ packets the posterior becomes $\text{Beta}(1+k,\,1+n-k)$, so updating just means adding the observed losses and deliveries to the prior counts. We report the posterior mean with the 95\% credible interval, and for <<seq_label>> we also show how the posterior narrows as more traffic is observed. To check whether the networks really are ordered by loss rate, we draw <<ord_draws>> values from each posterior and count the share of draws in which Wired $<$ Wi-Fi $<$ Mobile.
 
-The burst parameters get the same treatment. Each has its own posterior, $a\sim\text{Beta}(1+n_{NL},1+n_{NN})$ and $b\sim\text{Beta}(1+n_{LL},1+n_{LN})$, and from these we get credible intervals for $b/a$ and for the burst length. As a sanity check on the independent model, we also ask it how often a window should hold at least <<heavy_k>> losses, and set that next to how often it really does.
+The burst parameters are handled the same way. We place separate posteriors on $a$ and $b$, $a\sim\text{Beta}(1+n_{NL},1+n_{NN})$ and $b\sim\text{Beta}(1+n_{LL},1+n_{LN})$, and these give credible intervals for $b/a$ and for the burst length. As a check on the independent model, we also use it to predict how often a window should contain at least <<heavy_k>> losses, and compare that with how often it actually happens.
 
 \subsection{Design Effect}
-Why bursts are bad news for interval estimates becomes clear from the variance of a sum:
+The variance of a sum shows why bursts cause problems for interval estimates:
 \begin{equation}
 \operatorname{Var}\Big(\sum_i X_i\Big)=\sum_i\operatorname{Var}(X_i)+2\sum_{i<j}\operatorname{Cov}(X_i,X_j).
 \end{equation}
-If the packets were independent, every covariance would be zero and the variance of the loss count would be $np(1-p)$. Inside a burst, though, neighbouring packets tend to go the same way, so the covariances are positive and the true variance is bigger. The textbook interval leaves this out, so it is too narrow.
+For independent packets every covariance term is zero, and the variance of the loss count is just $np(1-p)$. Within a burst, though, neighbouring packets tend to have the same outcome. The covariances are positive and the true variance is larger. The standard interval ignores this and comes out too narrow.
 
-To fix it, we cut each trace into blocks of $m=<<block_packets>>$ packets (<<block_s>>~s) and compare how much the block counts really vary with how much they would vary under independence:
+To correct for it, we divide each trace into blocks of $m=<<block_packets>>$ packets (<<block_s>>~s) and compare the observed spread of the block counts with the spread independence would give:
 \begin{equation}
 \text{deff}=\frac{s^2_{\text{block}}}{m\,\hat p(1-\hat p)},\qquad n_{\text{eff}}=\frac{n}{\text{deff}},
 \end{equation}
-(deff is never allowed below 1.) One way to read $n_{\text{eff}}$ is as the number of independent packets that our correlated ones are worth. The adjusted posterior plugs in these effective counts, $\text{Beta}(1+k/\text{deff},\,1+(n-k)/\text{deff})$, and the interval comes out wider and more honest.
+where deff is not allowed to fall below 1. You can read $n_{\text{eff}}$ as the number of independent packets that carry the same information as our correlated ones. The adjusted posterior uses these effective counts, $\text{Beta}(1+k/\text{deff},\,1+(n-k)/\text{deff})$, and the interval it gives is wider and closer to the truth.
 
 \subsection{Monte Carlo Checks}
-Some questions cannot be settled from one trace, so we repeat the whole experiment many times. The first is power, or how likely each test is to spot the bursts. For capture lengths from <<dur_lo>>~s up to <<dur_hi>>~s we simulate <<power_reps>> captures per network and count how often each test rejects independence. The second is coverage, or how often a 95\% interval actually contains the true loss rate. Here we simulate <<cov_reps>> captures of <<cov_min>> minutes per network, build both the naive and the adjusted interval for each one, and count the hits. With <<power_reps>> repeats, each proportion is good to within about <<mc_se>> (one standard error).
+Two of our questions cannot be answered from a single trace, so we answer them by repeating the experiment many times. The first is power, the probability that each test notices the bursts. For capture lengths between <<dur_lo>>~s and <<dur_hi>>~s, we simulate <<power_reps>> captures per network and record how often each test rejects independence. The second is coverage: how often a 95\% interval actually includes the true loss rate. For this we simulate <<cov_reps>> captures of <<cov_min>> minutes for each network, build the naive and the adjusted interval for every capture, and count how many contain the true value. With <<power_reps>> repetitions, each of these proportions has a standard error of about <<mc_se>>.
 
 \section{Results}
-\begin{figure*}[!tb]
+
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=0.92\textwidth]{fig2_count_distribution_fits.png}
-\caption{Probability of $k$ losses in one second, on a log scale. The Poisson fit (dashed) drops far below the real tail; the Negative Binomial (green) follows it.}
+\includegraphics[width=\textwidth]{fig2_count_distribution_fits.png}
+\caption{Probability of $k$ losses in one second, on a log scale. The Poisson fit (dashed) falls well below the observed tail, while the Negative Binomial (green) stays close to it.}
 \label{fig:counts}
 \end{figure*}
 
 \subsection{Loss Counts}
-Poisson does not survive on any of the three networks, and Table~\ref{tab:counts} shows why. A Poisson count has its variance equal to its mean. Ours comes out at <<list_D>> times the mean, and the dispersion test returns $p<10^{-10}$ each time. The Negative Binomial does far better and has the lower AIC everywhere. Mobile shows the biggest gap, with the AIC falling from <<M_aicP>> to <<M_aicNB>>.
+None of the three networks fits the Poisson model, and Table~\ref{tab:counts} shows why. A Poisson distribution has its variance equal to its mean. The observed variance is <<list_D>> times the mean, and the dispersion test gives $p<10^{-10}$ in each case. The Negative Binomial fits much better and has a lower AIC on all three networks. The largest gain is on Mobile, where the AIC falls from <<M_aicP>> to <<M_aicNB>>.
 
-Most of the difference is in the tail. Over an hour of Wi-Fi traffic, Poisson expects roughly <<F_hpois>> seconds with <<heavy_k>> or more losses. The trace has <<F_hobs>>. The Negative Binomial expects <<F_hnb>>, which is close. In Fig.~\ref{fig:counts}, on a log scale, the Poisson curve dives almost at once while the real counts and the Negative Binomial keep going.
+Most of the difference between the two models lies in the tail. For Wi-Fi, the Poisson model expects about <<F_hpois>> seconds with <<heavy_k>> or more losses in an hour. The trace contains <<F_hobs>>, and the Negative Binomial expects <<F_hnb>>. Fig.~\ref{fig:counts} shows this on a log scale: the Poisson curve drops away almost at once, while the observed counts and the Negative Binomial carry on further out.
 
-\begin{figure*}[!tb]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=0.92\textwidth]{fig3_gap_survival.png}
-\caption{Probability that a gap between losses is longer than $t$, on a log scale. An exponential gives a straight line (dashed); the two-phase mixture (green) bends with the data.}
+\includegraphics[width=\textwidth]{fig3_gap_survival.png}
+\caption{Probability that the gap between two losses is longer than $t$, on a log scale. The exponential fit is a straight line (dashed); the two-phase mixture (green) bends with the data.}
 \label{fig:gaps}
 \end{figure*}
 
-\begin{table*}[!tb]
+\begin{table*}[!t]
 \caption{Losses per second and how well the count models fit}
 \label{tab:counts}
 \centering
@@ -183,13 +195,12 @@ Network & Loss rate & Mean / s & Variance & D & $\chi^2$ Poisson & AIC Poisson &
 \raggedright\scriptsize D is the variance divided by the mean. The last column gives the number of seconds with at least <<heavy_k>> losses: observed / expected under Poisson / expected under Negative Binomial. Every Poisson test gives $p<10^{-10}$.
 \end{table*}
 
-\FloatBarrier
 \subsection{Gaps Between Losses}
-The exponential does not survive either: the bootstrap KS test rejects it on every network (Table~\ref{tab:gaps}). Fig.~\ref{fig:gaps} makes the problem easy to see. Plotted on a log scale, an exponential survival curve is a straight line, and the real curves are anything but straight. They fall steeply at first, because a lot of the gaps are tiny, and then level off, because the rest are long.
+The exponential model is rejected as well, with the bootstrap KS test failing it on every network (Table~\ref{tab:gaps}). Fig.~\ref{fig:gaps} makes the problem easy to see. On a log scale an exponential survival curve is a straight line, and the observed curves are not straight. They fall steeply at first, because many of the gaps are very short, and then level off, because the remaining gaps are long.
 
-The two-phase mixture follows that shape well. Its fast phase has an average gap of <<fast_lo>> to <<fast_hi>>~ms, only one or two packets, so these are the gaps inside a burst. The slow phase averages between <<M_slows>> and <<W_slows>>~s, the quiet time between bursts. The fast phase holds <<W_wfast>> of the gaps on Wired but <<M_wfast>> on Mobile, which fits with the mobile link losing more of its packets in bursts. On Wired the mixture passes the KS test ($p=<<W_ksmix>>$), and it brings the AIC down sharply on all three. It is still rejected on Wi-Fi and Mobile, though, so it is a big step forward rather than the whole picture.
+The two-phase mixture reproduces this shape well. The mean gap in its fast phase is <<fast_lo>> to <<fast_hi>>~ms, one to two packets, which matches gaps inside a burst. The slow phase has a mean of <<M_slows>> to <<W_slows>>~s and matches the quiet periods between bursts. The share of gaps in the fast phase rises from <<W_wfast>> on Wired to <<M_wfast>> on Mobile, in line with more of the mobile link's losses falling inside bursts. The mixture passes the KS test on Wired ($p=<<W_ksmix>>$) and lowers the AIC considerably on all three networks. It is still rejected on Wi-Fi and Mobile, so it is a large improvement on the exponential but not a perfect description of the gaps.
 
-\begin{table}[!htbp]
+\begin{table}[!t]
 \caption{Gaps between losses: exponential and two-phase fits}
 \label{tab:gaps}
 \centering
@@ -207,20 +218,19 @@ Net. & $w$ & Fast & Slow & \multicolumn{2}{c}{KS $p$} & \multicolumn{2}{c}{AIC} 
 \raggedright\scriptsize $w$ is the share of gaps in the fast phase. Fast and slow are the average gap in each phase.
 \end{table}
 
-\FloatBarrier
 \subsection{Do Losses Depend on Each Other?}
-They do, and strongly. Both independence tests reject $H_0$ with $p<10^{-10}$ on every network (Table~\ref{tab:dep}). On Wi-Fi we counted <<F_runs>> runs where independence would give about <<F_runsE>>, a $z$-score of <<F_z>>. The Markov estimates make it easier to picture. A Wi-Fi packet that comes after a delivered packet is lost <<F_a>> of the time. One that comes after a lost packet is lost <<F_b>> of the time.
+They clearly do. Both independence tests reject $H_0$ with $p<10^{-10}$ on every network (Table~\ref{tab:dep}). For Wi-Fi we count <<F_runs>> runs, against about <<F_runsE>> expected under independence, a $z$-score of <<F_z>>. The Markov estimates make the effect easier to picture. On Wi-Fi a packet is lost <<F_a>> of the time when the packet before it was delivered, but <<F_b>> of the time when the packet before it was lost.
 
-Across Wired, Wi-Fi and Mobile, the posterior medians of $b/a$ are <<list_amp>>, so a single loss makes the next one <<amp_lo>> to <<amp_hi>> times more likely (Fig.~\ref{fig:markov}). The posterior probability that $b>a$ is <<pbga>> on every network, which leaves no real doubt about the direction. Bursts are short on average, <<list_blen>> packets, but they turn up far more often than chance would allow.
+The posterior medians of $b/a$ are <<list_amp>> for Wired, Wi-Fi and Mobile, so a single loss makes the next loss <<amp_lo>> to <<amp_hi>> times more likely (Fig.~\ref{fig:markov}). The posterior probability that $b>a$ is <<pbga>> on every network, so the direction of the effect is not in doubt. The average bursts are short, at <<list_blen>> packets, but they happen far more often than they would by chance.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=\columnwidth]{fig5_markov_posteriors.png}
-\caption{Posterior medians and 95\% credible intervals for $P(L\mid N)$ (open) and $P(L\mid L)$ (filled). On every network a loss makes the next loss far more likely.}
+\includegraphics[width=0.72\textwidth]{fig5_markov_posteriors.png}
+\caption{Posterior medians and 95\% credible intervals for $P(L\mid N)$ (open) and $P(L\mid L)$ (filled). On all three networks a loss sharply raises the chance that the next packet is lost too.}
 \label{fig:markov}
-\end{figure}
+\end{figure*}
 
-\begin{table}[!htbp]
+\begin{table}[!t]
 \caption{Tests of independence and burst parameters}
 \label{tab:dep}
 \centering
@@ -237,46 +247,42 @@ Net. & Runs & $E[R]$ & $z$ & $G^2$ & $P(L|N)$ & $P(L|L)$ & $b/a$ & Burst \\
 \raggedright\scriptsize $b/a$ and burst length (in packets) are posterior medians. All $p<10^{-10}$.
 \end{table}
 
-\begin{figure*}[!tb]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=0.92\textwidth]{fig4_bayesian_posteriors.png}
+\includegraphics[width=\textwidth]{fig4_bayesian_posteriors.png}
 \caption{Left: posterior distributions of the loss rate for the three networks. Right: the Wi-Fi posterior after 10~s, 60~s, 600~s and 3,600~s of traffic.}
 \label{fig:bayes}
 \end{figure*}
 
-\FloatBarrier
 \subsection{Comparing the Networks}
-The three networks are clearly different, which is reassuring given that we built them to be. The Kruskal-Wallis statistic is $H=<<kw_H>>$, the $\chi^2$ homogeneity statistic is <<chi_hom>> on <<chi_hom_df>> degrees of freedom, and even the largest Bonferroni-corrected pairwise p-value is <<bonf_max>>. The posterior mean loss rates are <<list_pmean>> (Table~\ref{tab:bayes}), and the posterior probability of the order Wired $<$ Wi-Fi $<$ Mobile is <<ordering>>.
+The three networks differ clearly, as expected from how they were set up. The Kruskal-Wallis statistic is $H=<<kw_H>>$, the $\chi^2$ homogeneity statistic is <<chi_hom>> on <<chi_hom_df>> degrees of freedom, and even the largest Bonferroni-corrected pairwise p-value is <<bonf_max>>. The posterior mean loss rates are <<list_pmean>> (Table~\ref{tab:bayes}), and the posterior probability of the ordering Wired $<$ Wi-Fi $<$ Mobile is <<ordering>>.
 
-Fig.~\ref{fig:bayes} shows the Bayesian estimates. After just <<seq_first_t>>~s of <<seq_label>> traffic the estimate is <<seq_first>>, which is wide. By <<seq_last_t>>~s it has narrowed to <<seq_last>>.
+Fig.~\ref{fig:bayes} shows the Bayesian estimates. With only <<seq_first_t>>~s of <<seq_label>> traffic the estimate is <<seq_first>>, a wide interval. After <<seq_last_t>>~s it has narrowed to <<seq_last>>.
 
-The predictive check shows how badly the independent model handles heavy seconds. For Wi-Fi it puts the chance of a second with <<heavy_k>> or more losses at <<F_pred>>. In the trace that happens <<F_seen>> of the time, about <<F_ratio>> times as often.
+The predictive check shows how poorly the independent model handles seconds with many losses. For Wi-Fi it puts the probability of a second with at least <<heavy_k>> losses at <<F_pred>>. In the trace such seconds make up <<F_seen>> of the total, about <<F_ratio>> times as often as predicted.
 
-
-
-\FloatBarrier
 \subsection{How Often Do the Intervals Work?}
-For us this is the result that matters most. Over <<cov_reps>> simulated <<cov_min>>-minute captures, the naive 95\% interval held the true loss rate in just <<list_covN>> of cases (Table~\ref{tab:bayes}, Fig.~\ref{fig:coverage}). On the burstiest network it missed more often than it hit.
+For us this is the key result. Across <<cov_reps>> simulated <<cov_min>>-minute captures, the naive 95\% interval included the true loss rate in only <<list_covN>> of cases (Table~\ref{tab:bayes}, Fig.~\ref{fig:coverage}). On the burstiest network it missed the true value more often than it caught it.
 
-\begin{figure}[!htbp]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=\columnwidth]{fig7_interval_coverage.png}
-\caption{How often the nominal 95\% interval contains the true loss rate, before and after the design-effect correction.}
+\includegraphics[width=0.62\textwidth]{fig7_interval_coverage.png}
+\caption{Share of nominal 95\% intervals that contain the true loss rate, before and after the design-effect correction.}
 \label{fig:coverage}
-\end{figure}
+\end{figure*}
 
-\begin{figure*}[!tb]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=0.92\textwidth]{fig6_power_curves.png}
-\caption{Power to detect dependence against capture length, from <<power_reps>> simulated captures per point. The dotted line marks a power of 0.8.}
+\includegraphics[width=\textwidth]{fig6_power_curves.png}
+\caption{Power to detect dependence as capture length grows, from <<power_reps>> simulated captures per point. The dotted line marks a power of 0.8.}
 \label{fig:power}
 \end{figure*}
 
-The design effects come out at <<W_deff>>, <<F_deff>> and <<M_deff>>. For Wi-Fi, that means our <<packets>> packets carry about as much information as <<F_neff>> independent ones would. Once we use these smaller effective sample sizes, coverage climbs back to <<list_covA>>, close to the 95\% it is supposed to be. The cost is a wider interval: on Wi-Fi the average width goes from <<F_wN>> to <<F_wA>> percentage points. We think that is a fair trade, since a narrow interval that misses the truth is not much use to anyone.
+The design effects are <<W_deff>>, <<F_deff>> and <<M_deff>>. For Wi-Fi, this means our <<packets>> packets hold roughly the same information as <<F_neff>> independent packets would. With these smaller effective sample sizes, coverage returns to <<list_covA>>, close to the intended 95\%. The intervals do get wider; on Wi-Fi the average width grows from <<F_wN>> to <<F_wA>> percentage points. We think that is worth it for intervals that contain the true value about as often as they claim to.
 
-The full Wi-Fi trace makes this concrete. The true loss rate there is <<F_true>>. The naive interval, <<F_pci>>, misses it entirely; the adjusted one, <<F_aci>>, does not.
+The full Wi-Fi trace is a good example. Its true loss rate is <<F_true>>. The naive interval of <<F_pci>> lies entirely above this value, while the adjusted interval of <<F_aci>> contains it.
 
-\begin{table*}[!tb]
+\begin{table*}[!t]
 \caption{Loss-rate estimates and coverage of 95\% intervals}
 \label{tab:bayes}
 \centering
@@ -293,13 +299,13 @@ Network & Posterior mean & Naive 95\% interval & deff & Adjusted 95\% interval &
 \raggedright\scriptsize Intervals are from the full <<duration_h>>-hour trace. Coverage is from <<cov_reps>> simulated <<cov_min>>-minute captures.
 \end{table*}
 
-
-
-\FloatBarrier
 \subsection{How Long Should a Capture Be?}
-Fig.~\ref{fig:power} shows each test's power rising as captures get longer, and Table~\ref{tab:power} lists the shortest length we tried that reaches a power of <<power_target>>. With the runs test, Mobile needs only <<M_pwR>>~s and Wi-Fi <<F_pwR>>~s. Wired needs <<W_pwR>>~s: its bursts are rare and short, so evidence builds up slowly. The runs test was the most powerful of the three on every network. At <<dur_hi>>~s, every test reaches a power of at least <<min_pw_hi>> everywhere, which is why we plan to record at least ten minutes per network in Phase 2.
+Fig.~\ref{fig:power} shows how the power of each test increases with capture length, and Table~\ref{tab:power} lists the shortest length we tried at which power reaches <<power_target>>. With the runs test, the mobile network needs only <<M_pwR>>~s and Wi-Fi <<F_pwR>>~s. Wired needs <<W_pwR>>~s, since its bursts are infrequent and short and evidence takes longer to build up. The runs test was the most powerful of the three on every network. At <<dur_hi>>~s every test has a power of at least <<min_pw_hi>> on every network, which is why we plan to record at least ten minutes per network in Phase 2.
 
-\begin{table}[!htbp]
+\section{Discussion and Limitations}
+It takes surprisingly little for independence to fail. A Bad spell of only a few packets is enough to break every model built on that assumption, and the loss rate alone gives no hint of it. Mobile loses roughly <<ratio_MW>> times as many packets as Wired, yet on both networks a loss makes another loss tens of times more likely. Burstiness is a separate property of a link and has to be measured separately.
+
+\begin{table}[!t]
 \caption{Shortest capture (s) with power of at least <<power_target>>}
 \label{tab:power}
 \centering
@@ -313,23 +319,18 @@ Network & Dispersion & Runs & Markov & Min. power at <<dur_hi>> s \\
 \end{tabular}
 \end{table}
 
+The coverage results show the problem is bigger than picking the right model. A naive interval counts every packet as a new and independent piece of evidence. When packets within a burst share the same outcome, there is much less independent evidence than the packet count suggests, and the interval turns out too narrow. The effect grows as the network becomes burstier, which is why Mobile has the lowest naive coverage. The design-effect correction is simple, needs only block counts, and brings coverage close to 95\% on all three networks.
 
+There are limits to what we can claim. The main one is that the data are simulated, and from the same kind of model that motivated the study. The tests do not use this, and the true parameters are only used to judge the estimates, but real links have other effects, such as busy hours, that our model leaves out. Phase 2 is meant to deal with this.
 
-\section{Discussion and Limitations}
-The striking thing is how little it takes. A Bad spell of a few packets is enough to break every model that assumes independence, and the loss rate on its own gives no hint of it. Mobile loses about <<ratio_MW>> times as many packets as Wired, yet on both of them one loss makes the next tens of times more likely. Burstiness is its own property of a link and needs to be measured on its own.
-
-The coverage results take this past model choice. A naive interval treats every packet as a new, independent piece of evidence. When packets in a burst share the same fate, there is much less independent evidence than the packet count suggests, and the interval ends up too tight. The burstier the network, the worse this gets, which is why Mobile has the lowest naive coverage. The design-effect fix is cheap (all it needs is block counts) and brings coverage close to 95\% on all three networks.
-
-There are clear limits to what we can claim. The biggest one is that the data are simulated, and from the very kind of model that motivated the study. The tests do not use this, and we only use the true parameters to judge the estimates, but real links have effects our model leaves out, busy hours being the obvious one. That is what Phase 2 is for.
-
-A few smaller points. The dispersion test compares the counts with a Poisson, but counts out of <<rate>> packets are strictly Binomial, with a variance a little under the mean. That makes the test slightly conservative, so if anything it understates burstiness. The runs and Markov tests rely on large-sample approximations. In very short captures their false-alarm rate can move away from 5\%, though on hour-long traces it stays close. The Negative Binomial and the two-phase mixture are both still rejected on Wi-Fi and Mobile, so neither is the full story. The design effect depends on the block length; ours is <<block_s>>~s, much longer than any Bad spell, which should be enough. Last, the headline numbers come from a single seeded trace per network, although the Monte Carlo checks repeat the whole experiment thousands of times.
+There are also a few smaller points. The dispersion test compares the counts with a Poisson distribution, but counts out of <<rate>> packets are really Binomial, with a variance slightly below the mean. This makes the test a little conservative, so it is more likely to understate burstiness than to overstate it. The runs and Markov tests rely on large-sample approximations. In very short captures their false-alarm rate may drift from 5\%, although for hour-long traces it stays close to 5\%. The Negative Binomial and the two-phase mixture are both still rejected on Wi-Fi and Mobile, so neither gives a complete description. The design effect depends on the block length we choose, and our <<block_s>>-s blocks are much longer than any Bad spell, which should be enough. Finally, the headline figures come from one seeded trace per network, although the Monte Carlo checks repeat the whole experiment thousands of times.
 
 \section{Conclusion and Future Work}
-We set out to test whether packet losses on <<n_scen>> simulated networks behave independently. They do not. Poisson and exponential models were rejected everywhere. Losses per second were <<list_D>> times more spread out than a Poisson allows, the gaps split into short in-burst gaps and long quiet ones, and one loss made the next <<amp_lo>> to <<amp_hi>> times more likely. The finding we would stress most is about the error bars: the usual 95\% interval for the loss rate was right only <<covN_lo>> to <<covN_hi>> of the time, and dividing the sample size by the design effect lifted that to <<covA_lo>> to <<covA_hi>>.
+We tested whether packet losses on <<n_scen>> simulated networks behave independently, and found that they do not. The Poisson and exponential models were rejected in every case. The per-second loss counts were <<list_D>> times more spread out than a Poisson model allows, the gaps split into short gaps within bursts and long quiet gaps between them, and each loss made the next one <<amp_lo>> to <<amp_hi>> times more likely. Most importantly, the standard 95\% interval for the loss rate was right in only <<covN_lo>> to <<covN_hi>> of cases. Dividing the sample size by the design effect raised this to between <<covA_lo>> and <<covA_hi>>.
 
-Phase 2 comes next. We will record steady streams of <<rate>> packets a second on real wired, Wi-Fi and mobile links, at least ten minutes each, and run the same code on them. After that, there are a few things we would like to try: estimating the Gilbert-Elliott parameters straight from the real traces with the Baum-Welch algorithm, fitting richer models to the tail, using the Phase 1 results as priors in a hierarchical Bayesian model that pools the networks, and comparing loss at peak and off-peak hours.
+The next step is Phase 2. We will record steady streams of <<rate>> packets per second on real wired, Wi-Fi and mobile links, for at least ten minutes each, and run the same code on them. After that we would like to estimate the Gilbert-Elliott parameters directly from the real traces using the Baum-Welch algorithm, try richer models for the tail, use the Phase 1 results as priors in a hierarchical Bayesian model across the networks, and compare loss at peak and off-peak hours.
 
 \section*{Reproducibility}
-Everything in this report comes from one Python pipeline, built on NumPy, SciPy and Matplotlib and run with seed <<seed>>. Running it again reproduces every table and figure.
+Every result in this report was produced by one Python pipeline, built on NumPy, SciPy and Matplotlib and run with seed <<seed>>. Running it again regenerates all of the tables and figures.
 
 \end{document}

@@ -330,7 +330,7 @@ def main():
             abstract_seen = True
             words = p.text
             clear_runs(p)
-            r1 = p.add_run("Abstract\u2014")
+            r1 = p.add_run("Abstract: ")
             set_font(r1, size=9, bold=True, italic=True)
             r2 = p.add_run(words)
             set_font(r2, size=9, bold=True)
@@ -391,14 +391,14 @@ def main():
             fmt(p, size=10, align=WD_ALIGN_PARAGRAPH.JUSTIFY, after=0, indent=Inches(0.14))
 
     # keywords line: rebuild after abstract
-    abs_p = next(p for p in doc.paragraphs if p.text.startswith("Abstract\u2014"))
+    abs_p = next(p for p in doc.paragraphs if p.text.startswith("Abstract: "))
     kw_src = abs_p._p.getnext()
     while kw_src is not None and not kw_src.tag.endswith("}p"):
         kw_src = kw_src.getnext()
     kw = Paragraph(kw_src, abs_p._parent)
     words = kw.text
     clear_runs(kw)
-    r1 = kw.add_run("Index Terms\u2014")
+    r1 = kw.add_run("Index Terms: ")
     set_font(r1, size=9, bold=True, italic=True)
     r2 = kw.add_run(words)
     set_font(r2, size=9, bold=True)
@@ -502,7 +502,7 @@ def main():
     # never leave an en or em dash in the wording (the IEEE labels "Abstract" and "Index Terms" excepted)
     for p in doc.paragraphs:
         t = p.text
-        for lab in ("Abstract\u2014", "Index Terms\u2014"):
+        for lab in ("Abstract: ", "Index Terms: "):
             t = t.replace(lab, "")
         if "\u2013" in t or "\u2014" in t:
             sys.exit(f"Dash rule broken in Word text: {t[:80]}")
