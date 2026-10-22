@@ -81,6 +81,23 @@ python3 slides/export_deck_data.py
 cd slides && npm install && node build_deck.js
 ```
 
+Final-review deck (21 slides: adds progress, discussion, limitations, the web app and an abbreviations appendix):
+
+```bash
+node slides/build_deck.js Packet_Loss_Case_Study_Final.pptx --final
+```
+
+## IEEE paper
+
+Six-page IEEE conference paper (IEEEtran). Every number is filled in from `results/results.json` and `slides/deck_data.json`.
+
+```bash
+python3 paper/build_paper.py   # writes paper/Packet_Loss_IEEE_Paper.tex and .pdf (needs pdflatex)
+python3 paper/make_docx.py     # writes paper/Packet_Loss_IEEE_Paper.docx (needs pandoc, python-docx)
+```
+
+For Overleaf, upload `paper/Packet_Loss_IEEE_Paper.tex`, `paper/IEEEtran.cls` and the `paper/figures/` folder.
+
 ## Known limitations
 
 - The index-of-dispersion test compares counts with a Poisson law. Counts of 50 independent packets are Binomial, whose variance is slightly below the mean, so the test is conservative: under independence it rejects about 1% of the time instead of 5%. It never over-states burstiness.

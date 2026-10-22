@@ -2,7 +2,7 @@
 
 Read this file top to bottom before doing anything on a new device. It records what exists, where it lives, how to run it, the rules the work follows, and what is still pending.
 
-Last updated: 22 Oct 2026. Repo state at handoff: `main` (latest code commit `fd6c12a`, this file added in `9661279`), 37 tests passing.
+Last updated: 22 Oct 2026 (paper and final deck added). Repo state at handoff: `main` (latest code commit `fd6c12a`, this file added in `9661279`), 37 tests passing.
 
 ---
 
@@ -206,14 +206,14 @@ QA used: `markitdown` text dump + regex checks for dashes and long sentences; re
 
 ## 8. What is pending
 
-### 8.1 IEEE conference paper (next big task)
-The user must submit an IEEE-format conference paper at the end. Agreed structure: Abstract + Keywords; I Introduction; II Related Work; III Loss Model and Data; IV Methodology; V Results (tables + figures); VI Discussion and Limitations; VII Conclusion and Future Work; References. Numbers must come from `results.json` / `deck_data.json`, wording original, no em dashes.
+### 8.1 IEEE conference paper (DONE, 22 Oct)
+Built from the data by `paper/build_paper.py` (LaTeX, IEEEtran, 6 pages) and `paper/make_docx.py` (Word, same content, IEEE-style two columns). Structure: Abstract, Index Terms, I Introduction, II Related Work, III Loss Model and Data, IV Methodology, V Results (6 tables, 5 figures), VI Discussion and Limitations, VII Conclusion and Future Work, Reproducibility, 21 references.
+- Author block uses `firstname.lastname2025@vitstudent.ac.in` emails and "Vellore Institute of Technology, Vellore, India". **Confirm the emails with each member**; edit `AUTHORS` in `paper/build_paper.py` and rebuild.
+- The only em dashes are IEEE's own "Abstract" and "Index Terms" labels (part of the template). The build stops if any other en or em dash appears.
+- Template text lives in `paper/template.tex`; numbers are `<<keys>>` filled by `build_paper.py`. Never type a number into the template.
 
-**Still unanswered questions, ask the user before writing:**
-1. Format: Word (.docx, IEEE conference template) or LaTeX (IEEEtran → PDF)?
-2. Page limit (usually 4 to 6)?
-3. Author block: names are known (above); still need department, university name, city and email addresses.
-4. Due date.
+### 8.1b Final review deck (DONE, 22 Oct)
+`node slides/build_deck.js Packet_Loss_Case_Study_Final.pptx --final` builds 21 slides: the 16 Review 1 slides (header now "Final Review") plus Progress since Review 1 (slide 2), Discussion, Limitations, Packet-Loss Lab web app (screenshots in `slides/assets/`), and an Appendix of abbreviations. Without `--final` the Review 1 deck is rebuilt unchanged (text checked identical to the presented copy).
 
 ### 8.2 Phase 2 (future work, not started)
 Real captures at 50 packets/s, ≥ 10 min per network; Baum-Welch estimation of Gilbert-Elliott parameters; 3-phase / HMM tail models; hierarchical Bayes across networks with Phase 1 posteriors as priors; peak vs off-peak loss rates.

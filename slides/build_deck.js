@@ -7,6 +7,10 @@ const pptxgen = require("pptxgenjs");
 const DATA = require(path.join(__dirname, "deck_data.json"));
 
 const CFG = DATA.config, R = DATA.results, SR = DATA.series;
+// "--final" builds the final-review deck: same slides plus discussion, limitations, the app and an appendix.
+const ARGS = process.argv.slice(2);
+const FINAL = ARGS.includes("--final");
+const STAGE = FINAL ? "Final Review" : "Review 1";
 
 // Team shown on the title slide: [name, registration number]
 const TEAM = [
@@ -85,7 +89,7 @@ function base(title, presenter, notes) {
     s.addText(presenter, { x: 0.4, y: 0.3, w: 1.9, h: 0.5, align: "center", valign: "middle", fontSize: 13, color: NAVY, isTextBox: true, margin: 0 });
   }
   s.addText(title, { x: 2.5, y: 0.2, w: 8.33, h: 0.75, align: "center", valign: "middle", fontFace: "Cambria", bold: true, fontSize: 28, color: INK, isTextBox: true, margin: 0 });
-  s.addText([{ text: "BAMAT207", options: { breakLine: true } }, { text: "Review 1" }], { x: 11.2, y: 0.28, w: 1.73, h: 0.6, align: "right", valign: "middle", fontSize: 12, bold: true, color: NAVY, isTextBox: true, margin: 0 });
+  s.addText([{ text: "BAMAT207", options: { breakLine: true } }, { text: STAGE }], { x: 11.2, y: 0.28, w: 1.73, h: 0.6, align: "right", valign: "middle", fontSize: 12, bold: true, color: NAVY, isTextBox: true, margin: 0 });
   s.addShape(S.RECTANGLE, { x: 0, y: 7.12, w: 13.333, h: 0.38, fill: { color: BLUE }, line: { color: BLUE } });
   s.addText("Statistical Modelling of Packet-Loss Patterns", { x: 0.4, y: 7.12, w: 8, h: 0.38, fontSize: 11, color: "FFFFFF", valign: "middle", isTextBox: true, margin: 0 });
   s.addText(String(page), { x: 12.3, y: 7.12, w: 0.63, h: 0.38, fontSize: 12, bold: true, color: "FFFFFF", align: "right", valign: "middle", isTextBox: true, margin: 0 });
@@ -157,14 +161,14 @@ const arrowDown = (s, x, y, h) => s.addShape(S.LINE, { x, y, w: 0, h, line: { co
 {
   const tk = SR.title.scenario;
   const s = base("PROBABILITY AND STATISTICS CASE STUDY", null,
-    `Introduce the team and the course. This is Review 1. The results come from Phase 1, a simulation study with known parameters. Phase 2 will apply the same analysis to measured network traces.`);
+    `Introduce the team and the course. This is ${FINAL ? "the final review" : "Review 1"}. The results come from Phase 1, a simulation study with known parameters. Phase 2 will apply the same analysis to measured network traces.`);
   text(s, 0.6, 1.35, 6.6, 0.5, "TITLE PAGE", { fontFace: "Cambria", bold: true, fontSize: 24, align: "center" });
   bullets(s, 0.6, 1.95, 6.6, 2.45, [
     ["Course:", "BAMAT207 Probability and Statistics"],
     ["Project title:", "Statistical Modelling of Packet-Loss Patterns in Computer Networks"],
     ["Focus:", "Distribution fitting, tests of independence and Bayesian estimation"],
     ["Tracks:", "Track 3 (core), Track 1 and Track 5 (supporting)"],
-    ["Stage:", "Review 1 (Phase 1: simulation study)"],
+    ["Stage:", FINAL ? "Final review (Phase 1 complete: simulation study)" : "Review 1 (Phase 1: simulation study)"],
   ], { fontSize: 15, paraSpaceAfter: 7 });
   text(s, 0.6, 4.45, 6.6, 0.3, "TEAM", { fontSize: 13, bold: true, color: NAVY });
   TEAM.forEach(([name, reg], i) => {
@@ -182,6 +186,40 @@ const arrowDown = (s, x, y, h) => s.addShape(S.LINE, { x, y, w: 0, h, line: { co
       title: `${SCN(tk).label}: losses per second, first ${SR.title.seconds} s`, catAxisLabelFrequency: 20, catAxisTitle: "Time (s)", showCatAxisTitle: true,
       valAxisTitle: "Lost packets", showValAxisTitle: true }));
   text(s, 7.8, 5.8, 4.93, 0.85, "Each bar is one second of traffic. Several losses often fall in the same second.", { fontSize: 13, color: MUTED });
+}
+
+// =====================================================================
+// Final only: progress since Review 1
+if (FINAL) {
+  const s = base("PROGRESS SINCE REVIEW 1", null,
+    `At Review 1 we showed the analysis and first results. Since then we tested every module, built an interactive web app and wrote the IEEE paper. All numbers in this deck still come from the same pipeline with seed ${CFG.seed}.`);
+  const col = (x, title, fill, items) => {
+    panel(s, x, 1.1, 4.0, 4.0, title);
+    bullets(s, x + 0.15, 1.6, 3.7, 3.4, items, { fontSize: 15, paraSpaceAfter: 10 });
+  };
+  col(0.4, "Shown at Review 1", "FFFFFF", [
+    ["Problem:", "objectives and hypotheses."],
+    ["Model:", "Good/Bad loss model and simulation design."],
+    ["Results:", "distribution fits and independence tests."],
+    ["Inference:", "Bayesian estimates and interval coverage."],
+    ["Planning:", "power study for Phase 2."],
+  ]);
+  col(4.67, "Added since", "FFFFFF", [
+    ["Testing:", "automated tests for edge cases, correctness and reproducibility."],
+    ["Fixes:", "empty traces and zero-loss cases now handled safely."],
+    ["Web app:", "Packet-Loss Lab, to explore the results live."],
+    ["IEEE paper:", "six-page conference paper with all results."],
+  ]);
+  col(8.93, "Final deliverables", "FFFFFF", [
+    ["Code:", "one Python pipeline, public on GitHub."],
+    ["Results:", "7 figures, results.json and summary.md."],
+    ["Paper:", "IEEE format, PDF and Word."],
+    ["Slides:", "this deck, built from the same data."],
+  ]);
+  stat(s, 0.4, 5.35, 3.0, 1.5, num(CFG.packets * N_NET), "packets analysed", T.blue, NAVY);
+  stat(s, 3.57, 5.35, 3.0, 1.5, num(CFG.power_reps), "simulated captures per Monte Carlo point", T.peach, NETCOL[1]);
+  stat(s, 6.75, 5.35, 3.0, 1.5, String(CFG.seed), "seed: every number reproducible", T.green, GOOD);
+  stat(s, 9.93, 5.35, 3.0, 1.5, "6 pages", "IEEE conference paper", T.rose, NETCOL[2]);
 }
 
 // =====================================================================
@@ -583,6 +621,82 @@ const arrowDown = (s, x, y, h) => s.addShape(S.LINE, { x, y, w: 0, h, line: { co
 }
 
 // =====================================================================
+// Final only: discussion
+if (FINAL) {
+  const lr = (k) => RS(k).descriptive.loss_rate;
+  const lowK = KEYS.reduce((a, k) => (lr(k) < lr(a) ? k : a)), highK = KEYS.reduce((a, k) => (lr(k) > lr(a) ? k : a));
+  const worstK = KEYS.reduce((a, k) => (R.coverage[k].naive < R.coverage[a].naive ? k : a));
+  const deff = (k) => RS(k).bayes.adjusted_posterior.deff;
+  const s = base("DISCUSSION", null,
+    `The loss rate alone hides how losses are arranged. ${SHORT[highK]} loses about ${Math.round(lr(highK) / lr(lowK))} times more packets than ${SHORT[lowK]}, yet both show strong bursts. Naive intervals get worse as bursts get stronger. The design-effect correction fixes this with one simple step.`);
+  panel(s, 0.4, 1.1, 6.6, 3.55, "What the results mean");
+  bullets(s, 0.55, 1.58, 6.3, 3.0, [
+    ["Burstiness is its own property.", `${SHORT[highK]} loses ${Math.round(lr(highK) / lr(lowK))} times more than ${SHORT[lowK]}. On both, a loss makes the next ${ampMin.toFixed(0)} to ${ampMax.toFixed(0)} times likelier.`],
+    ["Stronger bursts, worse intervals.", `Naive coverage is lowest on ${SHORT[worstK]}: ${pc(R.coverage[worstK].naive, 1)} instead of 95%.`],
+    ["One step fixes it.", `Dividing n by the design effect gives ${pc(covAMin, 1)} to ${pc(covAMax, 1)} coverage.`],
+  ], { fontSize: 16, paraSpaceAfter: 14 });
+  panel(s, 7.3, 1.1, 5.63, 3.55, "Naive coverage falls as design effect grows");
+  s.addChart([
+    { type: pres.charts.BAR, data: [{ name: "Naive coverage (%)", labels: NAMES, values: KEYS.map((k) => +(R.coverage[k].naive * 100).toFixed(1)) }],
+      options: { barDir: "col", chartColors: [GREY], showValue: true, dataLabelPosition: "outEnd", dataLabelFormatCode: '0.0"%"', barGapWidthPct: 60 } },
+    { type: pres.charts.LINE, data: [{ name: "Design effect", labels: NAMES, values: KEYS.map((k) => +deff(k).toFixed(2)) }],
+      options: { chartColors: [NETCOL[2]], lineSize: 2.5, lineDataSymbol: "circle", lineDataSymbolSize: 8, secondaryValAxis: true, secondaryCatAxis: true, showValue: true, dataLabelPosition: "t", dataLabelFormatCode: "0.00" } }],
+    chartOpts({ x: 7.4, y: 1.5, w: 5.43, h: 3.1, showLegend: true, legendPos: "b", valAxisMinVal: 0, valAxisMaxVal: 100,
+      valAxes: [{ showValAxisTitle: true, valAxisTitle: "Naive coverage (%)", valAxisMinVal: 0, valAxisMaxVal: 100 }, { showValAxisTitle: true, valAxisTitle: "Design effect", valAxisMinVal: 0, valAxisMaxVal: Math.ceil(Math.max(...KEYS.map(deff)) / 2 + 1) * 2, valGridLine: { style: "none" } }],
+      catAxes: [{ catAxisTitle: "Network" }, { catAxisHidden: true }] }));
+  text(s, 0.4, 4.85, 12.5, 0.3, "WHY IT MATTERS IN PRACTICE", { fontSize: 13, bold: true, color: NAVY });
+  pill(s, 0.4, 5.2, 3.0, 1.7, "VIDEO AND VOICE", `Error correction should cover a burst, not one packet. Mean burst: ${listJoin(KEYS.map((k) => RS(k).bayes.markov.burst_len_q[1].toFixed(2)))} packets.`, T.sand);
+  pill(s, 3.57, 5.2, 3.0, 1.7, "SERVICE REPORTS", "A loss rate should come with a burst measure, such as P(L|L).", T.blue);
+  pill(s, 6.75, 5.2, 3.0, 1.7, "PROTOCOL TUNING", "Retransmission timers tuned on random loss react badly to bursts.", T.peach);
+  pill(s, 9.93, 5.2, 3.0, 1.7, "STATISTICS", "Check independence before trusting any standard error or interval.", T.green);
+}
+
+// =====================================================================
+// Final only: limitations
+if (FINAL) {
+  const s = base("LIMITATIONS", null,
+    `Every study has limits. The main one is that Phase 1 data are simulated. The other points are about test approximations and model choices. For each one we list how we handle it now, or how Phase 2 will.`);
+  panel(s, 0.4, 1.1, 12.53, 5.8, "Limits of this study and how we handle them");
+  table(s, [
+    ["Limitation", "Why it matters", "How we handle it"],
+    ["Data are simulated", "Real links may add effects, such as busy hours.", "Phase 2 runs the same code on real captures."],
+    ["Dispersion test uses a Poisson baseline", `Counts of ${PPW} packets are Binomial, a little less spread out.`, "The test can only under-state burstiness, never over-state it."],
+    ["Runs and Markov tests are approximate", "In very short captures the false-alarm rate can drift from 5%.", `Our traces last ${minutes(CFG.duration_s)}, where the rate is close to 5%.`],
+    ["Tail models are not perfect", "Negative Binomial and two-phase fits are still rejected for some networks.", "Future work: hidden Markov and three-phase models."],
+    ["Design effect depends on block size", "Other block sizes give slightly different interval widths.", `${CFG.block_s}-second blocks are far longer than any Bad spell.`],
+    ["One trace per network", "A single run could be unusual.", `The Monte Carlo studies repeat the experiment ${num(CFG.coverage_reps)} times.`],
+  ], { x: 0.55, y: 1.6, w: 12.23, colW: [3.3, 4.6, 4.33], rowH: 0.72, fontSize: 13, leftCols: [1, 2] });
+}
+
+// =====================================================================
+// Final only: the web app
+if (FINAL) {
+  const wifi = KEYS.find((k) => k === SEQ) || KEYS[0];
+  const s = base("PACKET-LOSS LAB: WEB APP", null,
+    `The app runs the same code as the study. Its default view reproduces our ${SHORT[wifi]} results exactly. In the demo we show the red loss squares, then switch to coin-flip mode, then compare the two intervals.`);
+  panel(s, 0.4, 1.1, 4.4, 5.8, "What you can do");
+  bullets(s, 0.55, 1.58, 4.1, 3.4, [
+    ["Pick a network:", NAMES.join(", ") + "."],
+    ["Coin-flip mode:", "same loss rate, but every packet independent."],
+    ["Watch the packets:", "lost packets shown as red squares."],
+    ["Is it random?", "the four tests, passed or failed."],
+    ["How sure are we?", "naive and corrected intervals against the truth."],
+  ], { fontSize: 14, paraSpaceAfter: 12 });
+  pill(s, 0.55, 5.1, 4.1, 1.65, "ONE-MINUTE DEMO", `1. ${SHORT[wifi]}: losses clump together. 2. Coin-flip mode: all checks pass. 3. Intervals: naive misses, corrected covers.`, T.green);
+  s.addImage({ path: path.join(__dirname, "assets", "app_watch.jpg"), x: 5.05, y: 1.1, w: 3.85, h: 2.97 });
+  s.addImage({ path: path.join(__dirname, "assets", "app_sure.jpg"), x: 9.08, y: 1.1, w: 3.85, h: 2.97 });
+  s.addShape(S.RECTANGLE, { x: 5.05, y: 1.1, w: 3.85, h: 2.97, fill: { type: "none" }, line: { color: NAVY, width: 1 } });
+  s.addShape(S.RECTANGLE, { x: 9.08, y: 1.1, w: 3.85, h: 2.97, fill: { type: "none" }, line: { color: NAVY, width: 1 } });
+  text(s, 5.05, 4.12, 3.85, 0.3, "Watch the packets: red squares are losses", { fontSize: 11, color: MUTED, align: "center" });
+  text(s, 9.08, 4.12, 3.85, 0.3, "How sure are we: naive vs corrected", { fontSize: 11, color: MUTED, align: "center" });
+  const d = RS(wifi).descriptive;
+  stat(s, 5.05, 4.65, 2.5, 1.1, num(d.losses), `${SHORT[wifi]} losses, same as the study`, T.blue, NAVY);
+  stat(s, 7.74, 4.65, 2.5, 1.1, RS(wifi).bayes.markov.amp_q[1].toFixed(0) + "×", "likelier after a loss", T.rose, NETCOL[2]);
+  stat(s, 10.43, 4.65, 2.5, 1.1, String(CFG.seed), "default seed", T.green, GOOD);
+  pill(s, 5.05, 5.95, 7.88, 0.95, "RUN IT", "streamlit run app.py, from the project folder. It opens in the browser.", T.sand);
+}
+
+// =====================================================================
 // 15. Conclusions
 {
   const means = KEYS.map((k) => pc(RS(k).bayes.posterior.mean));
@@ -604,7 +718,7 @@ const arrowDown = (s, x, y, h) => s.addShape(S.LINE, { x, y, w: 0, h, line: { co
     ["Hierarchical Bayes:", "pool across networks, with Phase 1 results as priors."],
     ["Time of day:", "compare peak and off-peak loss rates."],
   ], { fontSize: 15, paraSpaceAfter: 10 });
-  panel(s, 0.4, 4.85, 12.53, 2.05, "Proposed Phase 2 timeline (weeks after Review 1)");
+  panel(s, 0.4, 4.85, 12.53, 2.05, `Proposed Phase 2 timeline (weeks after ${FINAL ? "the final review" : "Review 1"})`);
   const gx = 1.0, gw = 11.4, weeks = 8;
   for (let w = 0; w <= weeks; w += 2) {
     const x = gx + (w / weeks) * gw;
@@ -651,10 +765,43 @@ const arrowDown = (s, x, y, h) => s.addShape(S.LINE, { x, y, w: 0, h, line: { co
   });
   text(s, 0.6, 1.55, 8.0, 5.3, runs, { fontSize: 11, paraSpaceAfter: 3, color: INK });
   pill(s, 9.1, 1.1, 3.83, 1.6, "USE OF SOURCES", "Loss model [1, 2, 3]. EM algorithm [4]. Tests [5 to 9]. AIC [10]. Design effect [11]. Bayesian methods [12]. Software [13 to 15].", T.sand);
-  pill(s, 9.1, 2.9, 3.83, 1.25, "REPRODUCIBILITY", `Seed ${CFG.seed}. Running run_case_study.py regenerates all results.`, T.green);
+  pill(s, 9.1, 2.9, 3.83, 1.25, FINAL ? "PAPER AND CODE" : "REPRODUCIBILITY", FINAL ? `IEEE paper in the paper folder. Seed ${CFG.seed} regenerates every number.` : `Seed ${CFG.seed}. Running run_case_study.py regenerates all results.`, T.green);
   pill(s, 9.1, 4.35, 3.83, 1.25, "SOURCE CODE", "github.com/AashmanBiyani08/Prob_Stats_Project", T.blue);
   pill(s, 9.1, 5.8, 3.83, 1.1, "DATA", "Phase 1 traces are simulated. No measured data is used yet.", T.rose);
 }
 
-const out = process.argv[2] || path.join(__dirname, "..", "..", "Packet_Loss_Case_Study_Review1.pptx");
+// =====================================================================
+// Final only: appendix of abbreviations
+if (FINAL) {
+  const s = base("APPENDIX: ABBREVIATIONS", null,
+    `This slide lists every short form used in the deck, with its full name and a one-line meaning. Use it to answer panel questions on terms.`);
+  const L = [
+    ["GE", "Gilbert-Elliott model", "Two-state Good/Bad channel that makes bursts"],
+    ["πB", "Stationary Bad probability", "Share of time spent in the Bad state"],
+    ["hG, hB", "Loss probability in Good, Bad", "Chance a packet is lost in each state"],
+    ["MLE", "Maximum likelihood estimation", "Picks values that make the data most likely"],
+    ["EM", "Expectation-Maximisation", "Guess, update, repeat: fits the two-phase mixture"],
+    ["AIC", "Akaike Information Criterion", "Model score; lower is better"],
+    ["NB", "Negative Binomial", "Count model that allows clumping"],
+    ["χ²", "Chi-square test", "Compares observed and expected counts"],
+    ["KS", "Kolmogorov-Smirnov test", "Largest gap between data and model curves"],
+  ];
+  const Rr = [
+    ["LRT, G²", "Likelihood-ratio test, its statistic", "Does the previous packet matter?"],
+    ["P(L|N), P(L|L)", "Loss after delivered, after lost", "a and b; b/a is the burst amplification"],
+    ["H0, H1", "Null, alternative hypothesis", "No effect vs the effect we test for"],
+    ["α", "Significance level", `Reject H0 when p < ${ALPHA}`],
+    ["CrI", "Credible interval", "95% Bayesian range for the loss rate"],
+    ["deff", "Design effect", "Real spread ÷ spread under independence"],
+    ["n_eff", "Effective sample size", "n ÷ deff: worth of correlated packets"],
+    ["MC, SE", "Monte Carlo, standard error", "Repeat by simulation; its accuracy"],
+    ["pp", "Percentage points", "Difference between two percentages"],
+  ];
+  panel(s, 0.4, 1.1, 6.15, 5.8, "Models and fitting");
+  table(s, [["Short", "Full form", "Plain meaning"], ...L], { x: 0.5, y: 1.55, w: 5.95, colW: [0.85, 2.3, 2.8], rowH: 0.52, fontSize: 11, leftCols: [1, 2] });
+  panel(s, 6.78, 1.1, 6.15, 5.8, "Tests and inference");
+  table(s, [["Short", "Full form", "Plain meaning"], ...Rr], { x: 6.88, y: 1.55, w: 5.95, colW: [1.15, 2.2, 2.6], rowH: 0.52, fontSize: 11, leftCols: [1, 2] });
+}
+
+const out = ARGS.filter((a) => !a.startsWith("--"))[0] || path.join(__dirname, "..", "..", "Packet_Loss_Case_Study_Review1.pptx");
 pres.writeFile({ fileName: out }).then((f) => console.log("wrote", f));
