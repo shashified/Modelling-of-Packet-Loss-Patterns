@@ -96,7 +96,7 @@ def posteriors(posts, seq, labels, path, seq_label=""):
     for s in seq:
         x = np.linspace(0, xmax, 600)
         ax.plot(x * 100, stats.beta.pdf(x, s["alpha"], s["beta"]) / 100, label=f"after {s['t']} s")
-    ax.set_xlabel("packet loss probability (%)"); ax.set_title(f"Sequential updating — {seq_label}")
+    ax.set_xlabel("packet loss probability (%)"); ax.set_title(f"Sequential updating: {seq_label}")
     ax.legend(fontsize=8)
     _save(fig, path)
 
@@ -115,7 +115,7 @@ def markov_posteriors(mpost, labels, path):
         ax.annotate(f"x{m['amp_q'][1]:.0f}", ((m["a_q"][1] * m["b_q"][1]) ** 0.5 * 100, i + 0.18),
                     ha="center", fontsize=9, color=_col(k))
     ax.set_yticks(range(len(keys))); ax.set_yticklabels([labels[k] for k in keys])
-    ax.set_xscale("log"); ax.set_xlabel("probability (%) — posterior median with 95% credible interval")
+    ax.set_xscale("log"); ax.set_xlabel("probability (%), posterior median with 95% credible interval")
     ax.set_ylim(-0.6, len(keys) - 0.3)
     ax.set_title("A loss makes the next loss tens of times more likely")
     ax.legend(fontsize=8, loc="lower right")

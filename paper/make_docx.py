@@ -23,7 +23,8 @@ from docx.shared import Inches, Pt, RGBColor
 from docx.text.paragraph import Paragraph
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_paper import AUTHORS, AFFILIATION, OUT_NAME, PAPER  # noqa: E402
+from build_paper import OUT_NAME, PAPER  # noqa: E402
+SUBTITLE = "BAMAT207 Probability and Statistics: Case Study Report"
 
 ROMAN = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"]
 FONT = "Times New Roman"
@@ -40,6 +41,8 @@ def prepare_tex(tex):
     title = re.search(r"\\title\{(.*?)\}\n", tex, re.S).group(1).strip()
     body = tex[tex.index("\\begin{document}") + len("\\begin{document}"):tex.index("\\end{document}")]
     body = re.sub(r"\\author\{.*?\n\}\n", "", body, flags=re.S)
+    body = re.sub(r"\\author\{\\IEEEauthorblockN\{[^}]*\}\}\n", "", body)
+    body = body.replace("\\FloatBarrier", "")
     body = body.replace("table*}", "table}").replace("figure*}", "figure}")
     body = body.replace("\\sup_t", "\\text{sup}_t").replace("Network & ", "Net. & ")
     body = body.replace("\\maketitle", "").replace("\\IEEEtriggeratref{12}", "")
@@ -66,7 +69,8 @@ def prepare_tex(tex):
     body = re.sub(r"\\ref\{([^}]*)\}", lambda m: labels[m.group(1)], body)
 
     # citations -> [n]
-    bib = re.search(r"\\begin\{thebibliography\}\{99\}(.*?)\\end\{thebibliography\}", body, re.S).group(1)
+    bm = re.search(r"\\begin\{thebibliography\}\{99\}(.*?)\\end\{thebibliography\}", body, re.S)
+    bib = bm.group(1) if bm else ""
     keys = re.findall(r"\\bibitem\{([^}]*)\}", bib)
     order = {k: i + 1 for i, k in enumerate(keys)}
 
@@ -77,8 +81,9 @@ def prepare_tex(tex):
     body = re.sub(r"~?\\cite\{([^}]*)\}", lambda m: " " + cite(m), body)
     refs = re.split(r"\\bibitem\{[^}]*\}", bib)[1:]
     ref_par = "\n\n".join(f"[{i + 1}] " + r.strip() for i, r in enumerate(refs))
-    body = re.sub(r"\\begin\{thebibliography\}\{99\}.*?\\end\{thebibliography\}",
-                  lambda m: "\\section*{References}\n\n" + ref_par, body, flags=re.S)
+    if bm:
+        body = re.sub(r"\\begin\{thebibliography\}\{99\}.*?\\end\{thebibliography\}",
+                      lambda m: "\\section*{References}\n\n" + ref_par, body, flags=re.S)
 
     body = body.replace("\\begin{IEEEkeywords}", "\\paragraph{KEYWORDS}").replace("\\end{IEEEkeywords}", "")
     body = re.sub(r"\\setlength\{\\tabcolsep\}\{[^}]*\}", "", body)
@@ -296,23 +301,13 @@ def main():
     tp = insert_paragraph_before(first)
     tp.add_run(title)
     title_par = tp
-    atbl = doc.add_table(rows=1, cols=len(AUTHORS))
-    tp._p.addnext(atbl._tbl)
-    atbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-    for cell, (name, rno, mail) in zip(atbl.rows[0].cells, AUTHORS):
-        cell.paragraphs[0].text = ""
-        for i, (txt, size, italic) in enumerate([(name, 11, False), (f"Reg. No. {rno}", 10, False),
-                                                  (AFFILIATION, 10, True), (mail, 9, False)]):
-            p = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
-            run = p.add_run(txt)
-            set_font(run, size=size, italic=italic)
-            if i == 3:
-                run.font.name = "Courier New"
-            fmt_align = WD_ALIGN_PARAGRAPH.CENTER
-            p.alignment = fmt_align
-            p.paragraph_format.space_after = Pt(0)
+    sub = doc.add_paragraph()
+    tp._p.addnext(sub._p)
+    set_font(sub.add_run(SUBTITLE), size=11)
+    sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    atbl = sub
     spacer = doc.add_paragraph()
-    atbl._tbl.addnext(spacer._p)
+    atbl._p.addnext(spacer._p)
     fmt(spacer, after=6)
 
     # ---- walk paragraphs
@@ -321,7 +316,7 @@ def main():
     abstract_seen = False
     keywords_par = None
     for p in paras:
-        if p._p is title_par._p or p._p is spacer._p:
+        if p._p is title_par._p or p._p is spacer._p or p._p is sub._p:
             continue
         sty = p.style.name
         text = p.text.strip()
@@ -464,7 +459,7 @@ def main():
     # captions and floats
     tno = 0
     fno = 0
-    for tbl in doc.tables[1:]:
+    for tbl in doc.tables:
         tno += 1
         table_borders(tbl)
         tbl.alignment = WD_TABLE_ALIGNMENT.CENTER

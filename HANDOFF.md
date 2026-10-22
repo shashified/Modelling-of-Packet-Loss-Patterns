@@ -207,8 +207,8 @@ QA used: `markitdown` text dump + regex checks for dashes and long sentences; re
 ## 8. What is pending
 
 ### 8.1 IEEE conference paper (DONE, 22 Oct)
-Built from the data by `paper/build_paper.py` (LaTeX, IEEEtran, 6 pages) and `paper/make_docx.py` (Word, same content, IEEE-style two columns). Structure: Abstract, Index Terms, I Introduction, II Related Work, III Loss Model and Data, IV Methodology, V Results (6 tables, 5 figures), VI Discussion and Limitations, VII Conclusion and Future Work, Reproducibility, 21 references.
-- Author block uses `firstname.lastname2025@vitstudent.ac.in` emails and "Vellore Institute of Technology, Vellore, India". **Confirm the emails with each member**; edit `AUTHORS` in `paper/build_paper.py` and rebuild.
+Built from the data by `paper/build_paper.py` (LaTeX, IEEEtran, 8 pages) and `paper/make_docx.py` (Word, same content, IEEE-style two columns). Structure: Abstract, Index Terms, I Introduction, II Related Work, III Loss Model and Data, IV Methodology, V Results (6 tables, 5 figures), VI Discussion and Limitations, VII Conclusion and Future Work, Reproducibility. II is now "Background".
+- 22 Oct (evening) revision, at the user's request: no names, emails or author block (header is just "BAMAT207 Probability and Statistics: Case Study Report"), no reference list or numbered citations (earlier work is mentioned by name and year in Background), language rewritten in a plainer, more natural student voice, 8 pages (limit is 10). Floats are pinned to their Results subsection with `placeins`. `AUTHORS` in `build_paper.py` is no longer used by the template.
 - The only em dashes are IEEE's own "Abstract" and "Index Terms" labels (part of the template). The build stops if any other en or em dash appears.
 - Template text lives in `paper/template.tex`; numbers are `<<keys>>` filled by `build_paper.py`. Never type a number into the template.
 
