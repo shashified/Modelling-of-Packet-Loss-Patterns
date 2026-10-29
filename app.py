@@ -191,7 +191,7 @@ with tab1:
     secs = min(C.TIMELINE_S, len(E["counts"]))
     df = pd.DataFrame({"second": np.arange(1, secs + 1), "lost": E["counts"][:secs]})
     chart = alt.Chart(df).mark_bar(color=BAD).encode(
-        x=alt.X("second:Q", title="time (seconds)"), y=alt.Y("lost:Q", title="packets lost"),
+        x=alt.X("second:Q", title="time (seconds)", scale=alt.Scale(domain=[0, secs], nice=False)), y=alt.Y("lost:Q", title="packets lost"),
         tooltip=["second", "lost"]).properties(height=260)
     st.altair_chart(chart, width="stretch")
     st.markdown('<div class="explain">If losses were random, the bars would be small and evenly spread. '

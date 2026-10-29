@@ -111,6 +111,8 @@ def main():
     ap.add_argument("--size", type=int, default=64, help="payload bytes per packet (default 64)")
     ap.add_argument("--note", default="", help="free text saved with the run, e.g. 'hostel room, evening'")
     ap.add_argument("--out", default=os.path.join(HERE, "captures"))
+    ap.add_argument("--live", action="store_true",
+                    help="print one JSON progress line per second (used by the dashboard)")
     args = ap.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9_-]+", args.label):
         sys.exit("--label may contain only letters, digits, - and _")
@@ -186,7 +188,8 @@ def main():
     t0 = time.perf_counter_ns()
     sent = 0
     behind = 0
-    next_report = t0 + 10 * 10**9
+    report_every = 10**9 if args.live else 10 * 10**9
+    next_report = t0 + report_every
     try:
         for seq in range(n_total):
             due = t0 + seq * interval_ns
@@ -209,9 +212,13 @@ def main():
                 got = sum(1 for i in range(sent) if recv_ns[i])
                 waiting = sum(1 for i in range(sent) if not recv_ns[i] and now - send_ns[i] < args.timeout * 1e9)
                 lost = sent - got - waiting
-                print(f"  {(now - t0) / 1e9:6.0f} s  sent {sent:,}  lost so far {lost:,} "
-                      f"({100 * lost / max(1, sent - waiting):.2f}%)", flush=True)
-                next_report += 10 * 10**9
+                if args.live:
+                    print("PROGRESS " + json.dumps({"t": round((now - t0) / 1e9, 2), "sent": sent, "lost": lost,
+                                                    "decided": sent - waiting, "total": n_total}), flush=True)
+                else:
+                    print(f"  {(now - t0) / 1e9:6.0f} s  sent {sent:,}  lost so far {lost:,} "
+                          f"({100 * lost / max(1, sent - waiting):.2f}%)", flush=True)
+                next_report += report_every
     except KeyboardInterrupt:
         print("\nStopped early; saving what was sent.", flush=True)
     time.sleep(args.timeout)
@@ -253,6 +260,8 @@ def main():
         print(f"Warning: {behind:,} packets went out more than one interval late (busy laptop?). "
               f"Close heavy apps and keep the laptop plugged in.")
     print(f"Saved {base}.csv and .json")
+    if args.live:
+        print("SAVED " + base + ".csv", flush=True)
 
 
 if __name__ == "__main__":

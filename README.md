@@ -27,7 +27,18 @@ python3 run_case_study.py
 
 Requires Python 3.9+. The seed is fixed at 2026, so results are reproducible. Outputs go to `results/`: figures `fig1`–`fig7`, `results.json` and `summary.md`.
 
-## Interactive app
+## The final product: Packet-Loss Lab
+
+```bash
+streamlit run lab.py
+```
+
+One app with two pages:
+
+- **Real Network Lab (Phase 2)**, the default page. Press **Start recording** in the sidebar and it sends real packets over your network, then runs every statistic from the study by itself and shows the results as charts: a verdict card per network (bursty or random), then one tab per objective (O1 loss counts, O2 gaps, O3 independence, O4 comparison of networks, O5 Bayesian estimates, O6 reliability of intervals and power), a Phase 1 vs Phase 2 chart and a one-click report download. Capture files made from the terminal can also be dropped in.
+- **Simulation Lab (Phase 1)**, the simulated networks described below.
+
+## Interactive app (Phase 1 only)
 
 ```bash
 streamlit run app.py
@@ -100,7 +111,7 @@ For Overleaf, upload `paper/Packet_Loss_IEEE_Paper.tex`, `paper/IEEEtran.cls` an
 
 ## Phase 2: real network measurements
 
-`realworld/probe.py` sends 50 packets per second over a real network (Wi-Fi, phone hotspot, wired) and records which are lost; `realworld/analyze_captures.py` runs the Phase 1 statistics on the captures. Step-by-step guide: [realworld/README.md](realworld/README.md).
+Easiest: `streamlit run lab.py` and press **Start recording** (see above). From the terminal: `realworld/probe.py` sends 50 packets per second over a real network (Wi-Fi, phone hotspot, wired) and records which are lost; `realworld/analyze_captures.py` runs the Phase 1 statistics on the captures. Step-by-step guide: [realworld/README.md](realworld/README.md).
 
 ```bash
 caffeinate -i python3 realworld/probe.py --label wifi --target gateway --duration 600

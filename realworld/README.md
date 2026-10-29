@@ -4,6 +4,33 @@ Phase 1 showed, on simulated networks, that losses come in bursts and that naive
 
 Nothing needs installing beyond what the project already uses. `probe.py` itself is plain Python with no extra packages and no admin rights.
 
+## Easiest way: the dashboard
+
+```bash
+cd Prob_Stats_Project
+source .venv/bin/activate
+streamlit run lab.py
+```
+
+Your browser opens the **Real Network Lab**. In the sidebar pick the network you are on, leave "Send packets to" on **My router**, choose **10 min**, and press **Start recording**. Keep the tab open and the laptop plugged in. When the recording ends, the dashboard runs all the statistics on its own and shows:
+
+| Part of the page | What it answers |
+|---|---|
+| Verdict cards | Is each network bursty or random? Loss rate with its 95% credible interval, b/a, average burst, design effect |
+| Packets | Every packet as a green or red square, losses per second, round-trip time |
+| O1 Loss counts | Poisson vs Negative Binomial: variance ÷ mean, dispersion test, χ² fit, AIC |
+| O2 Gaps | Are gaps between losses exponential? KS test and the two-phase mixture |
+| O3 Independence | P(L given N) vs P(L given L), runs test, Markov test, burst lengths |
+| O4 Compare | Do the networks differ? Kruskal-Wallis, χ² homogeneity, Mann-Whitney with Bonferroni, posterior ordering |
+| O5 Bayesian | How the estimate sharpened over time, and the posterior predictive check |
+| O6 Reliability | Naive vs adjusted interval, how often each would be right, whether the capture was long enough |
+| Phase 1 vs 2 | The real networks plotted next to the simulated ones |
+| Report & glossary | One-click zip with summary tables, figures and raw data; every term explained |
+
+If the recording reports an ICMP permission problem, run the capture once from Terminal with `sudo` (command below) and the new file appears in the dashboard by itself. Toggle **Show demo data** to explore the page before you have real captures; demo captures are clearly marked DEMO.
+
+The rest of this guide shows the same steps from the terminal.
+
 ## What gets measured
 
 Each packet carries a sequence number and its send time. If no reply with that number arrives within 2 seconds, the packet counts as lost. This is round-trip loss: the request or the reply went missing.
