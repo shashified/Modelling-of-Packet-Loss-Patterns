@@ -31,16 +31,16 @@
 
 \title{Statistical Modelling of Packet-Loss Patterns in Computer Networks: Distribution Fitting, Burstiness Testing and Bayesian Estimation}
 
-\author{\IEEEauthorblockN{Kyra Panwar}\IEEEauthorblockA{25BBS0095}
+\author{\IEEEauthorblockN{Kyra Panwar}\IEEEauthorblockA{VIT Vellore\\25BBS0095}
 \and
-\IEEEauthorblockN{Shashank Tiwari}\IEEEauthorblockA{25BDS0053}
+\IEEEauthorblockN{Shashank Tiwari}\IEEEauthorblockA{VIT Vellore\\25BDS0053}
 \and
-\IEEEauthorblockN{Aashman Biyani}\IEEEauthorblockA{25BBS0100}}
+\IEEEauthorblockN{Aashman Biyani}\IEEEauthorblockA{VIT Vellore\\25BBS0100}}
 
 \maketitle
 
 \begin{abstract}
-Simplest models treat each lost packet as independent of the others which is why most of the times a single number is reported as the loss rate. If this was true, the number of losses in each second would follow a Poisson distribution whereas the gaps between consecutive losses would follow an exponential distribution model.
+Simplest models treat each lost packet as independent of the others which is why most of the times a single number is reported as the loss rate. If this was true, the number of losses in each second would follow a Poisson distribution whereas the gaps between consecutive losses would follow an exponential distribution model. Three networks (wired broadband, campus Wi-Fi and a mobile hotspot) were simulated with a two-state Gilbert-Elliott model, each sending <<rate>> packets per second for <<duration_h>> hour, which comes to <<packets>> packets per network. We fitted models for the counts and for the waiting times, tested whether neighbouring packets are independent, and estimated the loss rates with a Bayesian Beta-Binomial model. Independence did not hold on any of the <<n_scen>> networks. The variance of the per-second loss count was <<list_D>> times the mean, where a Poisson model gives 1, and after a single loss the next packet was <<amp_lo>> to <<amp_hi>> times more likely to be lost. This shows up directly in the error bars. Over <<cov_reps>> simulated captures, the standard 95\% interval for the loss rate contained the true value in only <<covN_lo>> to <<covN_hi>> of cases. Reducing the sample size by a design effect raised coverage to between <<covA_lo>> and <<covA_hi>>. A power study suggests recording at least ten minutes on each network once we move on to real measurements.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -229,7 +229,7 @@ The posterior medians of $b/a$ are <<list_amp>> for Wired, Wi-Fi and Mobile, so 
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.72\textwidth]{fig5_markov_posteriors.png}
+\includegraphics[width=0.66\textwidth]{fig5_markov_posteriors.png}
 \caption{Posterior medians and 95\% credible intervals for $P(L\mid N)$ (open) and $P(L\mid L)$ (filled). On all three networks a loss sharply raises the chance that the next packet is lost too.}
 \label{fig:markov}
 \end{figure*}
@@ -270,7 +270,7 @@ For us this is the key result. Across <<cov_reps>> simulated <<cov_min>>-minute 
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.62\textwidth]{fig7_interval_coverage.png}
+\includegraphics[width=0.56\textwidth]{fig7_interval_coverage.png}
 \caption{Share of nominal 95\% intervals that contain the true loss rate, before and after the design-effect correction.}
 \label{fig:coverage}
 \end{figure*}
