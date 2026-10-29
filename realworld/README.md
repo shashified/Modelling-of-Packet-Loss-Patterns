@@ -25,7 +25,12 @@ Your browser opens the **Real Network Lab**. In the sidebar pick the network you
 | O5 Bayesian | How the estimate sharpened over time, and the posterior predictive check |
 | O6 Reliability | Naive vs adjusted interval, how often each would be right, whether the capture was long enough |
 | Phase 1 vs 2 | The real networks plotted next to the simulated ones |
+| 🆚 Live vs study | Your run side by side with the matching case-study network (or another run): a same-story check for every test and four overlaid charts |
+| 🧠 Assumptions vs findings | Each textbook assumption, what the case study found, what your runs show, and why |
+| 💾 Saved runs | Save runs with a name and note, see all saved results in one table and chart, reopen or delete them |
 | Report & glossary | One-click zip with summary tables, figures and raw data; every term explained |
+
+While recording, the page shows the loss rate and the "after a loss" multiplier live, next to the case study's numbers. The sidebar's **📖 Read me** explains how the project works, every formula and every decision rule. Saved runs live in `realworld/saved_runs/`.
 
 If the recording reports an ICMP permission problem, run the capture once from Terminal with `sudo` (command below) and the new file appears in the dashboard by itself. Toggle **Show demo data** to explore the page before you have real captures; demo captures are clearly marked DEMO.
 

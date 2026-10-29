@@ -27,9 +27,26 @@ def test_dashboard_runs_and_classifies(tmp_path, monkeypatch):
     _write_capture(tmp_path, "burst", simulate_markov(6000, 0.004, 0.35, rng))
     _write_capture(tmp_path, "rand", rng.random(6000) < 0.012)
     monkeypatch.setenv("PL_CAPTURES_DIR", str(tmp_path))
+    lib = tmp_path / "lib"
+    monkeypatch.setenv("PL_LIBRARY_DIR", str(lib))
     at = st_testing.AppTest.from_file(os.path.join(ROOT, "realworld", "dashboard.py"), default_timeout=600)
     at.run()
     assert not at.exception
-    assert len(at.tabs) == 9
+    assert len(at.tabs) == 12
     text = " ".join(m.value for m in at.markdown)
     assert "Losses come in bursts" in text and "No evidence of bursts" in text
+    # live vs study tab: the bursty run should tell the same story as the study on the burst checks
+    assert any("checks tell the same story" in m.value for m in at.markdown)
+    # saved runs: save one through the form, then it is listed with its results
+    form_btn = [b for b in at.button if "Save" in str(b.label) and b.label.startswith("💾 Save")]
+    assert form_btn
+    import run_library as RL
+    assert RL.list_runs() == []
+    at.selectbox[[s.label for s in at.selectbox].index("Run")].set_value("burst")
+    [t for t in at.text_input if t.label == "Name"][-1].set_value("Test burst run")
+    [b for b in at.button if b.label == "💾 Save"][0].click()
+    at.run()
+    assert not at.exception
+    runs = RL.list_runs()
+    assert len(runs) == 1 and runs[0]["name"] == "Test burst run" and runs[0]["verdict"] == "bursty"
+    assert any(getattr(h, "value", "") == "Saved runs (1)" for h in at.subheader)

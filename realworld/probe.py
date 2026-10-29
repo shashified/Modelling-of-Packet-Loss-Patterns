@@ -190,6 +190,8 @@ def main():
     behind = 0
     report_every = 10**9 if args.live else 10 * 10**9
     next_report = t0 + report_every
+    # live transition counts over packets whose fate is already known (used by the dashboard)
+    scan, prev_state, n_after_n, n_nl, n_after_l, n_ll = 0, None, 0, 0, 0, 0
     try:
         for seq in range(n_total):
             due = t0 + seq * interval_ns
@@ -213,8 +215,20 @@ def main():
                 waiting = sum(1 for i in range(sent) if not recv_ns[i] and now - send_ns[i] < args.timeout * 1e9)
                 lost = sent - got - waiting
                 if args.live:
+                    limit = now - int(args.timeout * 1e9)
+                    while scan < sent and (recv_ns[scan] or send_ns[scan] < limit):
+                        cur = 0 if recv_ns[scan] else 1
+                        if prev_state == 0:
+                            n_after_n += 1
+                            n_nl += cur
+                        elif prev_state == 1:
+                            n_after_l += 1
+                            n_ll += cur
+                        prev_state, scan = cur, scan + 1
                     print("PROGRESS " + json.dumps({"t": round((now - t0) / 1e9, 2), "sent": sent, "lost": lost,
-                                                    "decided": sent - waiting, "total": n_total}), flush=True)
+                                                    "decided": sent - waiting, "total": n_total,
+                                                    "after_n": n_after_n, "nl": n_nl, "after_l": n_after_l, "ll": n_ll}),
+                          flush=True)
                 else:
                     print(f"  {(now - t0) / 1e9:6.0f} s  sent {sent:,}  lost so far {lost:,} "
                           f"({100 * lost / max(1, sent - waiting):.2f}%)", flush=True)

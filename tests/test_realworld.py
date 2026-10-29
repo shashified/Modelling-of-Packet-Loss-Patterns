@@ -97,3 +97,24 @@ def test_analysis_separates_bursty_from_random(tmp_path):
     assert "| bursty |" in summary and "bursty |" in summary and "no evidence of bursts" in summary
     for fig in ["real_fig1_timeline.png", "real_fig2_count_fits.png", "real_fig3_gap_survival.png", "real_fig4_markov.png"]:
         assert (out / fig).exists()
+
+
+def test_study_reference_rebuilds_phase1_traces():
+    import study_ref as SR
+    R = SR.load_results()
+    T = SR.traces()
+    for k in SR.KEYS:
+        assert int(T[k]["loss"].sum()) == R["scenarios"][k]["descriptive"]["losses"]
+    assert SR.match("hotspot") == "S3_Mobile" and SR.match("wired") == "S1_Wired" and SR.match("wifi") == "S2_WiFi"
+
+
+def test_run_library_save_list_delete(tmp_path, monkeypatch):
+    import run_library as RL
+    monkeypatch.setenv("PL_LIBRARY_DIR", str(tmp_path / "lib"))
+    cap = tmp_path / "wifi_20260101-000000.csv"
+    cap.write_text("seq,t_send_s,received,rtt_ms\n0,0.0,1,5.0\n1,0.02,0,\n")
+    rid = RL.save_run(str(cap), "Hostel Wi-Fi", "evening", dict(loss_rate=0.5, verdict="thin"))
+    runs = RL.list_runs()
+    assert len(runs) == 1 and runs[0]["name"] == "Hostel Wi-Fi" and runs[0]["note"] == "evening"
+    RL.delete_run(rid)
+    assert RL.list_runs() == []

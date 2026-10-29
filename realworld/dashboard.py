@@ -30,6 +30,9 @@ from src import loss_model as LM                 # noqa: E402
 from src import plots as P                       # noqa: E402
 import analyze_captures as AC                    # noqa: E402
 import lab_stats as LS                           # noqa: E402
+import lab_readme                                # noqa: E402
+import run_library as RL                         # noqa: E402
+import study_ref as SR                           # noqa: E402
 
 CAPS = os.environ.get("PL_CAPTURES_DIR", os.path.join(ROOT, "realworld", "captures"))
 DEMO = os.path.join(ROOT, "realworld", "demo_captures")
@@ -85,9 +88,9 @@ def nice_dur(s):
 
 
 # ------------------------------------------------------------------ data loading and analysis
-def list_captures(folder):
+def list_captures(folder, pattern="*.csv"):
     out = []
-    for f in sorted(glob.glob(os.path.join(folder, "*.csv"))):
+    for f in sorted(glob.glob(os.path.join(folder, pattern))):
         meta_p = f[:-4] + ".json"
         meta = {}
         if os.path.exists(meta_p):
@@ -128,6 +131,16 @@ def analyse_file(path, mtime):
     return out
 
 
+@st.cache_data(show_spinner=False)
+def study_results():
+    return SR.load_results()
+
+
+@st.cache_data(show_spinner=False)
+def study_traces():
+    return SR.traces()
+
+
 def verdict(r):
     if not r["enough_losses"]:
         return "thin"
@@ -155,6 +168,7 @@ def make_demo():
 
 # ------------------------------------------------------------------ sidebar: record / upload / choose
 st.sidebar.title("📶 Real Network Lab")
+lab_readme.render()
 st.sidebar.markdown("**1. Record a capture**")
 with st.sidebar.form("record"):
     net = st.selectbox("Network you are on", ["Wi-Fi", "Phone hotspot", "Wired (Ethernet)", "Other"])
@@ -164,6 +178,9 @@ with st.sidebar.form("record"):
     dur_s = st.select_slider("Length", options=[30, 120, 300, 600, 1200], value=600, format_func=lambda s: {
         30: "30 s (quick test)", 120: "2 min", 300: "5 min", 600: "10 min (recommended)", 1200: "20 min"}[s])
     note = st.text_input("Note (optional)", placeholder="e.g. hostel room, evening")
+    ref_choice = st.selectbox("Compare live against", ["Matching case-study network"] +
+                              [f"Case study: {SR.label(k)}" for k in SR.KEYS],
+                              help="The simulated network from the case study that the live numbers are set against.")
     go = st.form_submit_button("▶ Start recording", type="primary", width="stretch")
 
 st.sidebar.markdown("**2. Or add capture files**")
@@ -208,11 +225,19 @@ if go:
         cmd += ["--note", note.strip()]
     st.subheader(f"Recording **{label}** for {nice_dur(dur_s)}")
     st.caption("Keep this tab open and the laptop still and plugged in. The analysis starts by itself when the recording ends.")
+    ref_key = SR.match(label) if ref_choice.startswith("Matching") else \
+        next(k for k in SR.KEYS if ref_choice.endswith(SR.label(k)))
+    R1 = study_results()
+    REF = SR.summary(R1, ref_key) if R1 else None
+    if REF:
+        st.caption(f"Live comparison with the case study's **{SR.label(ref_key)}**: loss rate "
+                   f"{pct(REF['loss_rate'], 2)}, a loss makes the next one {REF['ba']:.0f}× likelier.")
     bar = st.progress(0.0)
-    m1, m2, m3 = st.columns(3)
-    sent_m, lost_m, rate_m = m1.empty(), m2.empty(), m3.empty()
-    chart_ph = st.empty()
-    log, per_sec, last = [], [], 0
+    m1, m2, m3, m4 = st.columns(4)
+    sent_m, lost_m, rate_m, ba_m = m1.empty(), m2.empty(), m3.empty(), m4.empty()
+    lc1, lc2 = st.columns(2)
+    chart_ph, cum_ph = lc1.empty(), lc2.empty()
+    log, per_sec, cum, last = [], [], [], 0
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1, cwd=ROOT)
     saved_path = None
     for line in proc.stdout:
@@ -222,13 +247,28 @@ if go:
             bar.progress(min(1.0, d["sent"] / d["total"]), text=f"{d['t']:.0f} s of {dur_s} s")
             sent_m.metric("Packets sent", f"{d['sent']:,}")
             lost_m.metric("Lost so far", f"{d['lost']:,}")
-            rate_m.metric("Loss rate so far", pct(d["lost"] / max(1, d["decided"]), 2))
+            live_rate = d["lost"] / max(1, d["decided"])
+            rate_m.metric("Loss rate so far", pct(live_rate, 2),
+                          f"study {pct(REF['loss_rate'], 2)}" if REF else None, delta_color="off")
+            if d.get("after_l", 0) >= 3 and d.get("nl", 0) > 0 and d.get("after_n", 0) > 0:
+                live_ba = (d["ll"] / d["after_l"]) / (d["nl"] / d["after_n"])
+                ba_m.metric("After a loss, next loss is", f"{live_ba:.1f}× likelier",
+                            f"study {REF['ba']:.0f}×" if REF else None, delta_color="off")
+            else:
+                ba_m.metric("After a loss, next loss is", "waiting for losses")
             per_sec.append(dict(second=round(d["t"]), lost=d["lost"] - last))
+            cum.append(dict(second=d["t"], rate=100 * live_rate, source="this run (live)"))
             last = d["lost"]
             if len(per_sec) % 2 == 0 or len(per_sec) < 5:
                 chart_ph.altair_chart(alt.Chart(pd.DataFrame(per_sec)).mark_bar(color=BAD).encode(
-                    x=alt.X("second:Q", title="time (s)"), y=alt.Y("lost:Q", title="packets lost", axis=alt.Axis(format="d", tickMinStep=1))).properties(height=200),
-                    width="stretch")
+                    x=alt.X("second:Q", title="time (s)"), y=alt.Y("lost:Q", title="packets lost", axis=alt.Axis(format="d", tickMinStep=1))
+                ).properties(height=200, title="Packets lost each second"), width="stretch")
+                live = alt.Chart(pd.DataFrame(cum)).mark_line(color=NAVY, strokeWidth=2).encode(
+                    x=alt.X("second:Q", title="time (s)"), y=alt.Y("rate:Q", title="loss rate so far (%)"))
+                if REF:
+                    live = live + alt.Chart(pd.DataFrame({"y": [100 * REF["loss_rate"]], "lab": [f"study: {SR.label(ref_key)}"]})).mark_rule(
+                        color=GREY, strokeDash=[6, 4], strokeWidth=2).encode(y="y:Q", tooltip=["lab", "y"])
+                cum_ph.altair_chart(live.properties(height=200, title="Loss rate so far vs the case study (dashed)"), width="stretch")
         elif line.startswith("SAVED "):
             saved_path = line[6:].strip()
     proc.wait()
@@ -242,9 +282,15 @@ if go:
     bar.progress(1.0, text="Done")
     st.success(f"Saved {os.path.basename(saved_path)}. Running the statistics now.")
     st.session_state["just_recorded"] = saved_path
+    st.session_state["vs_run_path"] = saved_path
+    st.session_state["vs_ref_key"] = ref_key
+    st.info("Open the **🆚 Live vs study** tab below for the full side-by-side comparison, "
+            "and use **💾 Save this run** to keep it in your saved runs.")
 
 # ------------------------------------------------------------------ choose captures
 caps = list_captures(CAPS)
+lib_caps = list_captures(RL.folder(), "*/*.csv")
+caps += lib_caps
 if use_demo:
     if not glob.glob(os.path.join(DEMO, "*.csv")):
         make_demo()
@@ -265,29 +311,42 @@ if not caps:
 
 def cap_name(c):
     dur = c["meta"].get("planned_duration_s")
-    return f"{c['label']}  ·  {c['when']:%d %b %H:%M}" + (f"  ·  {nice_dur(dur)}" if dur else "")
+    tag = "💾 " if c["meta"].get("saved_name") else ""
+    return f"{tag}{c['label']}  ·  {c['when']:%d %b %H:%M}" + (f"  ·  {nice_dur(dur)}" if dur else "")
 
 latest = {}
 for c in caps:
-    latest[c["label"]] = c["path"]
+    if not c["meta"].get("saved_name"):
+        latest[c["label"]] = c["path"]
 default = list(latest.values())
 if st.session_state.get("just_recorded") and st.session_state["just_recorded"] not in default:
     default.append(st.session_state["just_recorded"])
 by_path = {c["path"]: c for c in caps}
-chosen = st.sidebar.multiselect("Newest capture of each network is picked", list(by_path), default=default,
+# keep the selection across reruns; add captures that appeared since the last run (new recordings, demo)
+known = st.session_state.setdefault("known_paths", set())
+if "chosen" not in st.session_state:
+    st.session_state["chosen"] = default
+else:
+    st.session_state["chosen"] = [p for p in st.session_state["chosen"] if p in by_path] + \
+        [p for p in default if p not in known and p not in st.session_state["chosen"]]
+if not st.session_state["chosen"]:
+    st.session_state["chosen"] = default
+known.update(by_path)
+chosen = st.sidebar.multiselect("Newest capture of each network is picked (💾 = saved run)", list(by_path), key="chosen",
                                 format_func=lambda p: cap_name(by_path[p]))
 if not chosen:
     st.info("Pick at least one capture in the sidebar.")
     st.stop()
 
 with st.spinner("Running all the statistics (about 10 s per capture the first time)..."):
-    A = {}
+    A, KEY2PATH = {}, {}
     for pth in chosen:
         c = by_path[pth]
         key = c["label"]
         if key in A:
             key = f"{key} ({c['when']:%d %b %H:%M})"
         A[key] = analyse_file(pth, c["mtime"])
+        KEY2PATH[key] = pth
 names = list(A)
 COL = {k: PALETTE[i % len(PALETTE)] for i, k in enumerate(names)}
 color_scale = alt.Scale(domain=names, range=[COL[k] for k in names])
@@ -332,11 +391,78 @@ short = [k for k in names if A[k]["res"]["duration_s"] < 590]
 if short:
     st.caption(f"Shorter than 10 minutes: {', '.join(short)}. The power study (O6 tab) shows whether that was long enough.")
 
-tabs = st.tabs(["👀 Packets", "📊 O1 Loss counts", "⏱️ O2 Gaps", "🔗 O3 Independence", "⚖️ O4 Compare",
-                "🎯 O5 Bayesian", "📏 O6 Reliability", "🧪 Phase 1 vs 2", "📄 Report & glossary"])
+
+
+# ------------------------------------------------------------------ run summaries (for saving and comparing)
+def real_summary(k):
+    """Headline numbers of one real run, in the same shape as SR.summary() for a study network."""
+    x, r = A[k], A[k]["res"]
+    p, c = r["posterior"], by_path[KEY2PATH[k]]
+    out = dict(name=k, network=c["meta"].get("original_label") or c["meta"].get("label") or k,
+               target=c["meta"].get("target"), mode=c["meta"].get("mode"), captured=c["when"].isoformat(timespec="minutes"),
+               loss_rate=r["loss_rate"], ci=(p["ci_low"], p["ci_high"]), packets=r["packets"], losses=r["losses"],
+               duration_s=r["duration_s"], rtt_median_ms=r.get("rtt_median_ms"), verdict=verdict(r))
+    if r["enough_losses"]:
+        t, f, mk, adj, d = r["tests"], r["fits"], r["markov"], r["adjusted_posterior"], r["descriptive"]
+        ks, cov = t.get("ks_exponential") or {}, x.get("coverage") or {}
+        out.update(D=d["window_var"] / d["window_mean"], disp_p=t["dispersion"]["p"], chisq_p=t["chisq_poisson"]["p"],
+                   nb_better=bool(f["aic_negbin"] < f["aic_poisson"]), runs_z=t["runs"]["z"], runs_p=t["runs"]["p"],
+                   a=t["markov_lrt"]["p_L_given_N"], b=t["markov_lrt"]["p_L_given_L"], markov_p=t["markov_lrt"]["p"],
+                   ba=mk["amp_q"][1], mean_burst=d["mean_burst_len"], ks_p=ks.get("p"), ks_B=ks.get("B"),
+                   deff=adj["deff"], adj_ci=(adj["ci_low"], adj["ci_high"]),
+                   cov_naive=cov.get("naive"), cov_adjusted=cov.get("adjusted"))
+    return out
+
+
+def peq(p, B=None):
+    t = fmt_p(p, B)
+    return "p " + t if t.startswith("<") else "p = " + t
+
+
+def _p(x):
+    return 1.0 if x is None or (isinstance(x, float) and np.isnan(x)) else x
+
+
+def reading(s):
+    """What each test says about one run (or study network), in words."""
+    if "D" not in s:
+        return {}
+    return {
+        "poisson": "not Poisson (clumped)" if min(_p(s["disp_p"]), _p(s["chisq_p"])) < ALPHA else "Poisson fits",
+        "runs": "losses cluster" if s["runs_p"] < ALPHA and s["runs_z"] < 0 else "no clustering",
+        "markov": "a loss pulls in the next" if s["markov_p"] < ALPHA and s["b"] > s["a"] else "no pull",
+        "gaps": "not exponential" if _p(s["ks_p"]) < ALPHA else "exponential fits",
+        "interval": ("usual 95% interval too narrow" if s.get("cov_naive") is not None and s["cov_naive"] < 0.9
+                     else "usual 95% interval fine"),
+    }
+
+
+VERDICT_TXT = {"bursty": "🔴 bursty", "random": "🟢 no evidence of bursts", "thin": "⚪ too few losses"}
+RS = {k: real_summary(k) for k in names}
+
+# ------------------------------------------------------------------ offer to save a fresh recording
+jr = st.session_state.get("just_recorded")
+jr_key = next((k for k in names if KEY2PATH[k] == jr), None)
+if jr_key and not st.session_state.get(f"saved::{jr}"):
+    with st.form("save_new", border=True):
+        st.markdown(f"**💾 Save this run** ({jr_key}, {nice_dur(RS[jr_key]['duration_s'])}) to keep it with its results "
+                    "in the **💾 Saved runs** tab.")
+        f1, f2 = st.columns([1, 2])
+        nm = f1.text_input("Name", value=f"{jr_key} {by_path[jr]['when']:%d %b %H:%M}")
+        nt = f2.text_input("Note", value=by_path[jr]["meta"].get("note", ""), placeholder="where, when, anything unusual")
+        if st.form_submit_button("💾 Save run", type="primary"):
+            RL.save_run(jr, nm, nt, RS[jr_key])
+            st.session_state[f"saved::{jr}"] = True
+            st.success(f"Saved as “{nm}”. It is listed in the 💾 Saved runs tab.")
+
+TAB_NAMES = {"packets": "👀 Packets", "vs": "🆚 Live vs study", "o1": "📊 O1 Loss counts", "o2": "⏱️ O2 Gaps",
+             "o3": "🔗 O3 Independence", "o4": "⚖️ O4 Compare", "o5": "🎯 O5 Bayesian", "o6": "📏 O6 Reliability",
+             "assume": "🧠 Assumptions vs findings", "phase": "🧪 Phase 1 vs 2", "saved": "💾 Saved runs",
+             "report": "📄 Report & glossary"}
+T = dict(zip(TAB_NAMES, st.tabs(list(TAB_NAMES.values()))))
 
 # ------------------------------------------------------------------ tab: packets
-with tabs[0]:
+with T["packets"]:
     st.subheader("Every square is one packet")
     for k in names:
         loss = A[k]["loss"]
@@ -373,7 +499,7 @@ with tabs[0]:
     explain("How long each reply took to come back. Spikes often appear just before or during bursts of loss, when the link is struggling.")
 
 # ------------------------------------------------------------------ tab: O1
-with tabs[1]:
+with T["o1"]:
     obj("O1", "Do losses per second follow a Poisson distribution?")
     if not full:
         st.info("No capture has enough losses (at least 10) for this test.")
@@ -412,7 +538,7 @@ with tabs[1]:
             "A small p-value (below 0.05) rejects Poisson. AIC (Akaike Information Criterion) picks the better model; lower is better.")
 
 # ------------------------------------------------------------------ tab: O2
-with tabs[2]:
+with T["o2"]:
     obj("O2", "Is the waiting time between losses exponential?")
     if not full:
         st.info("No capture has enough losses for this test.")
@@ -456,7 +582,7 @@ with tabs[2]:
             "KS (Kolmogorov-Smirnov) p below 0.05 rejects the exponential; it uses a bootstrap because the rate is estimated from the same data.")
 
 # ------------------------------------------------------------------ tab: O3
-with tabs[3]:
+with T["o3"]:
     obj("O3", "Does one loss make the next one more likely?")
     if not full:
         st.info("No capture has enough losses for this test.")
@@ -508,7 +634,7 @@ with tabs[3]:
                 "asks directly whether P(L|L) differs from P(L|N). b/a is how many times likelier a loss is right after a loss; 1 means random.")
 
 # ------------------------------------------------------------------ tab: O4
-with tabs[4]:
+with T["o4"]:
     obj("O4", "Do the networks differ?")
     if len(names) < 2:
         st.info("Record or pick at least two networks to compare them.")
@@ -530,8 +656,8 @@ with tabs[4]:
         p_order = float(np.mean(np.all([draws[order[i]] < draws[order[i + 1]] for i in range(len(order) - 1)], axis=0)))
         cmp = HT.compare_scenarios({k: A[k]["counts"] for k in names}, {k: A[k]["loss"] for k in names})
         c1, c2, c3 = st.columns(3)
-        c1.metric("Kruskal-Wallis H", f"{cmp['kruskal_H']:.1f}", f"p = {fmt_p(cmp['kruskal_p'])}", delta_color="off")
-        c2.metric("χ² homogeneity", f"{cmp['chi2_homog']:.1f}", f"p = {fmt_p(cmp['chi2_p'])}", delta_color="off")
+        c1.metric("Kruskal-Wallis H", f"{cmp['kruskal_H']:.1f}", f"{peq(cmp['kruskal_p'])}", delta_color="off")
+        c2.metric("χ² homogeneity", f"{cmp['chi2_homog']:.1f}", f"{peq(cmp['chi2_p'])}", delta_color="off")
         c3.metric("P(" + " < ".join(order) + ")", f"{p_order:.3f}", "from 50,000 posterior draws", delta_color="off")
         st.dataframe(pd.DataFrame([{"Pair": f"{q['a']} vs {q['b']}", "Mann-Whitney U": f"{q['U']:,.0f}",
                                     "p (Bonferroni)": fmt_p(q["p_bonf"]),
@@ -542,7 +668,7 @@ with tabs[4]:
                 "testing several pairs does not inflate false alarms. The χ² homogeneity test asks whether the loss proportion is the same everywhere.")
 
 # ------------------------------------------------------------------ tab: O5
-with tabs[5]:
+with T["o5"]:
     obj("O5", "Bayesian estimate of each loss rate")
     rows = []
     for k in names:
@@ -567,7 +693,7 @@ with tabs[5]:
             "If the observed share is far above the predicted one, the random model cannot explain the data.")
 
 # ------------------------------------------------------------------ tab: O6
-with tabs[6]:
+with T["o6"]:
     obj("O6", "Can we trust the usual 95% interval, and was the capture long enough?")
     if not full:
         st.info("No capture has enough losses for this check.")
@@ -616,7 +742,7 @@ with tabs[6]:
                 "Monte Carlo standard error is about 1 percentage point.")
 
 # ------------------------------------------------------------------ tab: Phase 1 vs 2
-with tabs[7]:
+with T["phase"]:
     st.subheader("Simulated networks (Phase 1) next to real ones (Phase 2)")
     ph1 = os.path.join(ROOT, "results", "results.json")
     rows = []
@@ -645,7 +771,7 @@ with tabs[7]:
                 "the Gilbert-Elliott model from Phase 1 was a realistic choice; if they sit elsewhere, the real data tell us how to retune it.")
 
 # ------------------------------------------------------------------ tab: report and glossary
-with tabs[8]:
+with T["report"]:
     st.subheader("Download everything")
 
     @st.cache_data(show_spinner=False)
@@ -699,3 +825,335 @@ with tabs[8]:
         ("Monte Carlo", "Answering a question by simulating it many times."),
         ("RTT", "Round-trip time: how long a reply takes to come back (ms)."),
     ], columns=["Term", "Plain meaning"]), hide_index=True, width="stretch")
+
+# ------------------------------------------------------------------ tab: live run vs the case study
+RUN_C, REF_C = "#2E6DB4", "#E07A1F"
+
+
+def fmt_ci(ci, d=3):
+    return f"[{pct(ci[0], d)}, {pct(ci[1], d)}]"
+
+
+def series_for(source):
+    """Packets, counts per second and gaps of a real run (key in A) or a study network (key in SR.KEYS)."""
+    if source in SR.KEYS:
+        tr = study_traces()[source]
+        return tr["loss"], tr["counts"], tr["gaps"], tr["rate"]
+    x = A[source]
+    return x["loss"], x["counts"], x.get("gaps"), x["rate"]
+
+
+with T["vs"]:
+    st.subheader("Your real run next to the case study")
+    R1 = study_results()
+    pre_run = next((k for k in names if KEY2PATH[k] == st.session_state.get("vs_run_path")), None)
+    v1, v2 = st.columns(2)
+    run_k = v1.selectbox("Your run", names, index=names.index(pre_run) if pre_run else len(names) - 1, key="vs_run")
+    ref_opts = ([f"Case study: {SR.label(k)}" for k in SR.KEYS] if R1 else []) + [f"Another run: {k}" for k in names if k != run_k]
+    if not ref_opts:
+        st.info("The case-study results (results/results.json) are missing. Run `python3 run_case_study.py` once.")
+    else:
+        want = st.session_state.get("vs_ref_key") if pre_run == run_k else None
+        want = want or SR.match(RS[run_k]["network"])
+        idx = next((i for i, o in enumerate(ref_opts) if R1 and o == f"Case study: {SR.label(want)}"), 0)
+        ref_pick = v2.selectbox("Compare with", ref_opts, index=idx, key="vs_ref",
+                                help="The case-study network your run is meant to resemble, or another of your runs.")
+        if ref_pick.startswith("Case study"):
+            ref_src = next(k for k in SR.KEYS if ref_pick.endswith(SR.label(k)))
+            REF = SR.summary(R1, ref_src)
+            ref_name = SR.label(ref_src) + " (study)"
+        else:
+            ref_src = ref_pick.split(": ", 1)[1]
+            REF = RS[ref_src]
+            ref_name = ref_src
+        RUN = RS[run_k]
+        rr, rf = reading(RUN), reading(REF)
+
+        # headline: two cards side by side
+        def card(s, title, colour):
+            bits = [f"<span>Loss rate <b>{pct(s['loss_rate'], 3)}</b> {fmt_ci(s['ci'])}</span>",
+                    f"<span><b>{s['losses']:,}</b> of {s['packets']:,} lost</span>",
+                    f"<span>{nice_dur(s['duration_s'])}</span>"]
+            if "ba" in s:
+                bits += [f"<span>Next loss <b>{s['ba']:.1f}×</b> likelier after a loss</span>",
+                         f"<span>Mean burst <b>{s['mean_burst']:.2f}</b></span>", f"<span>Design effect <b>{s['deff']:.2f}</b></span>"]
+            return (f'<div class="net" style="border-left:7px solid {colour}"><h4>{title}: {VERDICT_TXT[s["verdict"]]}</h4>'
+                    f'<div class="row">{"".join(bits)}</div></div>')
+        h1, h2 = st.columns(2)
+        h1.markdown(card(RUN, f"Your run: {run_k}", RUN_C), unsafe_allow_html=True)
+        h2.markdown(card(REF, ref_name, REF_C), unsafe_allow_html=True)
+
+        # side-by-side table
+        lo, hi = RUN["ci"]
+        same_level = lo <= REF["loss_rate"] <= hi
+        rows = [dict(Measure="Loss rate", Reference=f"{pct(REF['loss_rate'], 3)}", **{"Your run": f"{pct(RUN['loss_rate'], 3)} {fmt_ci(RUN['ci'])}"},
+                     **{"Same story?": "✅ same level" if same_level else
+                        f"❌ {'higher' if RUN['loss_rate'] > REF['loss_rate'] else 'lower'} ({RUN['loss_rate'] / max(REF['loss_rate'], 1e-12):.2f}×)"})]
+        if rr and rf:
+            def row(m, key, fr, fu):
+                rows.append({"Measure": m, "Reference": f"{fr} → {rf[key]}", "Your run": f"{fu} → {rr[key]}",
+                             "Same story?": "✅ yes" if rr[key] == rf[key] else "❌ no"})
+            row("O1 Var ÷ mean (D), Poisson tests", "poisson", f"D = {REF['D']:.2f}", f"D = {RUN['D']:.2f}")
+            row("O2 Gaps, KS test", "gaps", f"{peq(REF['ks_p'], REF.get('ks_B'))}", f"{peq(RUN['ks_p'], RUN.get('ks_B'))}")
+            row("O3 Runs test", "runs", f"z = {REF['runs_z']:.1f}", f"z = {RUN['runs_z']:.1f}")
+            row("O3 P(L|L) vs P(L|N), Markov test", "markov", f"b/a = {REF['ba']:.1f}", f"b/a = {RUN['ba']:.1f}")
+            row("O6 Naive 95% interval coverage", "interval",
+                f"{pct(REF.get('cov_naive'), 0)}" if REF.get("cov_naive") is not None else "n/a",
+                f"{pct(RUN.get('cov_naive'), 0)}" if RUN.get("cov_naive") is not None else "n/a")
+            rows.append({"Measure": "Overall verdict", "Reference": VERDICT_TXT[REF["verdict"]], "Your run": VERDICT_TXT[RUN["verdict"]],
+                         "Same story?": "✅ yes" if REF["verdict"] == RUN["verdict"] else "❌ no"})
+        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        agree = sum(r_["Same story?"].startswith("✅") for r_ in rows[1:])
+        if rr and rf:
+            explain(f"<b>{agree} of {len(rows) - 1}</b> checks tell the same story as {ref_name}. "
+                    f"Your loss rate is {RUN['loss_rate'] / max(REF['loss_rate'], 1e-12):.2f}× the reference "
+                    f"({'inside' if same_level else 'outside'} your run's 95% credible interval). "
+                    "The burst checks matter more than the level: a network can lose fewer packets than the study's and still lose them in bursts.")
+        else:
+            explain("Your run has fewer than 10 losses, so only the loss rate can be compared. The burst tests need more losses: "
+                    "record longer, at a busier time, or further from the router.")
+
+        # charts: the same four views, both sources overlaid
+        Lr, Cr, Gr, rate_r = series_for(run_k)
+        Lf, Cf, Gf, rate_f = series_for(ref_src)
+        src_scale = alt.Scale(domain=[f"your run: {run_k}", ref_name], range=[RUN_C, REF_C])
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**Loss rate as the run went on**")
+            n_r = len(Lr)
+            seq_r = pd.DataFrame(LS.sequential_curve(Lr, rate_r)).assign(source=f"your run: {run_k}")
+            seq_f = pd.DataFrame(LS.sequential_curve(Lf[:max(n_r, 10)], rate_f)).assign(source=ref_name)
+            dfq = pd.concat([seq_r, seq_f])
+            for col in ("mean", "lo", "hi"):
+                dfq[col] *= 100
+            band = alt.Chart(dfq).mark_area(opacity=0.18).encode(x=alt.X("t:Q", title="time into the run (s)"),
+                                                                 y=alt.Y("lo:Q", title="loss rate (%)"), y2="hi:Q",
+                                                                 color=alt.Color("source:N", scale=src_scale, title=None))
+            line = alt.Chart(dfq).mark_line(strokeWidth=2).encode(x="t:Q", y="mean:Q", color=alt.Color("source:N", scale=src_scale, title=None),
+                                                                 tooltip=["source", "t", alt.Tooltip("mean:Q", format=".3f")])
+            st.altair_chart((band + line).properties(height=240).configure_legend(orient="bottom"), width="stretch")
+        with c2:
+            st.markdown("**Losses in each second (log scale)**")
+            kmax = 10
+            rows = []
+            for nm_, cnt in [(f"your run: {run_k}", Cr), (ref_name, Cf)]:
+                b_ = np.bincount(np.minimum(cnt, kmax), minlength=kmax + 1) / len(cnt)
+                rows += [dict(source=nm_, k=("10+" if i == kmax else str(i)), order=i, share=float(v)) for i, v in enumerate(b_) if v > 0]
+            st.altair_chart(alt.Chart(pd.DataFrame(rows)).mark_line(point=True, strokeWidth=2).encode(
+                x=alt.X("k:N", sort=[str(i) for i in range(kmax)] + ["10+"], title="losses in a 1-s window", axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("share:Q", scale=alt.Scale(type="log"), title="share of seconds"),
+                color=alt.Color("source:N", scale=src_scale, title=None), tooltip=["source", "k", alt.Tooltip("share:Q", format=".4f")]
+            ).properties(height=240).configure_legend(orient="bottom"), width="stretch")
+        c3, c4 = st.columns(2)
+        with c3:
+            st.markdown("**Chance of a loss: after a delivered vs after a lost packet**")
+            rows = []
+            for nm_, s_ in [(f"your run: {run_k}", RUN), (ref_name, REF)]:
+                if "a" in s_:
+                    rows += [dict(source=nm_, after="after delivered, P(L|N)", p=100 * s_["a"]),
+                             dict(source=nm_, after="after lost, P(L|L)", p=100 * s_["b"])]
+            if rows:
+                st.altair_chart(alt.Chart(pd.DataFrame(rows)).mark_bar().encode(
+                    x=alt.X("after:N", title=None, axis=alt.Axis(labelAngle=0, labelLimit=200)), xOffset="source:N",
+                    y=alt.Y("p:Q", title="chance of a loss (%)"),
+                    color=alt.Color("source:N", scale=src_scale, title=None), tooltip=["source", "after", alt.Tooltip("p:Q", format=".3f")]
+                ).properties(height=240).configure_legend(orient="bottom"), width="stretch")
+            else:
+                st.caption("Needs at least 10 losses in both.")
+        with c4:
+            st.markdown("**Time between losses (log scale)**")
+            rows = []
+            for nm_, g in [(f"your run: {run_k}", Gr), (ref_name, Gf)]:
+                if g is None or len(g) < 5:
+                    continue
+                g = np.sort(g)
+                surv = 1 - np.arange(1, len(g) + 1) / len(g)
+                idx = np.unique(np.linspace(0, len(g) - 2, min(300, len(g) - 1)).astype(int))
+                rows += [dict(source=nm_, t=float(g[i]), surv=float(surv[i])) for i in idx if surv[i] > 0]
+            if rows:
+                st.altair_chart(alt.Chart(pd.DataFrame(rows)).mark_line(strokeWidth=2).encode(
+                    x=alt.X("t:Q", title="gap between losses (s)"),
+                    y=alt.Y("surv:Q", scale=alt.Scale(type="log"), title="P(gap > t)"),
+                    color=alt.Color("source:N", scale=src_scale, title=None), tooltip=["source", "t", "surv"]
+                ).properties(height=240).configure_legend(orient="bottom"), width="stretch")
+            else:
+                st.caption("Needs at least 10 losses in both.")
+        explain("Blue is your run, orange the reference. For the case study, the reference curve on the left uses the study's "
+                "simulated packets for the same length of time as your run, so both had the same chance to settle. "
+                "Bursty networks show a long right tail of heavy seconds, a much taller 'after lost' bar, and a gap curve that "
+                "drops fast and then flattens.")
+
+# ------------------------------------------------------------------ tab: assumptions vs findings
+with T["assume"]:
+    st.subheader("What we assumed, what the case study showed, what your runs show, and why")
+    R1 = study_results()
+    ST = {k: SR.summary(R1, k) for k in SR.KEYS} if R1 else {}
+    FR = [RS[k] for k in names if "D" in RS[k]]
+
+    def rng_txt(vals, f):
+        vals = [v for v in vals if v is not None]
+        return f(min(vals)) if len(vals) == 1 or f(min(vals)) == f(max(vals)) else f"{f(min(vals))} to {f(max(vals))}"
+
+    def per_run(fn):
+        if not FR:
+            return "No run has 10 or more losses yet, so this cannot be tested on real data."
+        return "; ".join(f"{s['name']}: {fn(s)}" for s in FR)
+
+    def count_txt(key, bad_value):
+        if not FR:
+            return ""
+        n_bad = sum(reading(s)[key] == bad_value for s in FR)
+        return f"**{n_bad} of {len(FR)}** runs reject it. "
+
+    st_ba = rng_txt([ST[k]["ba"] for k in ST], lambda v: f"{v:.0f}×") if ST else "n/a"
+    st_D = rng_txt([ST[k]["D"] for k in ST], lambda v: f"{v:.1f}") if ST else "n/a"
+    st_cn = rng_txt([ST[k]["cov_naive"] for k in ST], lambda v: f"{100 * v:.0f}%") if ST else "n/a"
+    st_ca = rng_txt([ST[k]["cov_adjusted"] for k in ST], lambda v: f"{100 * v:.0f}%") if ST else "n/a"
+    pw_txt = ""
+    if R1:
+        bits = []
+        for k in SR.KEYS:
+            curve = R1["power"][k]["runs"]
+            first = next((d_ for d_, pw in zip(R1["power"]["durations_s"], curve) if pw >= C.POWER_TARGET), None)
+            bits.append(f"{SR.label(k)} {nice_dur(first) if first else 'over 10 min'}")
+        pw_txt = ", ".join(bits)
+    kw_txt = "Record at least two networks."
+    if len(names) >= 2:
+        cmp_ = HT.compare_scenarios({k: A[k]["counts"] for k in names}, {k: A[k]["loss"] for k in names})
+        kw_txt = (f"Kruskal-Wallis H = {cmp_['kruskal_H']:.1f}, {peq(cmp_['kruskal_p'])}; "
+                  f"χ² homogeneity {peq(cmp_['chi2_p'])}: the loss rates "
+                  f"{'differ' if cmp_['chi2_p'] < ALPHA else 'do not differ detectably'}.")
+
+    def power_at(k):
+        """Power of the runs test (fitted chain) for this run's own length."""
+        pts = A[k].get("power") or []
+        target = max(60, A[k]["res"]["duration_s"])
+        return min(pts, key=lambda q: abs(q["duration_s"] - target))["power"] if pts else float("nan")
+
+    ITEMS = [
+        ("Losses are independent: every packet is its own coin flip",
+         f"Rejected for all three networks. Runs test p < 1e-10 and a loss makes the next one {st_ba} likelier.",
+         count_txt("runs", "losses cluster") + per_run(lambda s: f"b/a = {s['ba']:.1f}, runs {peq(s['runs_p'])}"),
+         "Interference, fading and a full router queue last much longer than the 20 ms between packets, so one cause knocks out "
+         "several packets in a row. The channel has memory: it sits in a Good or a Bad state for a while (the Gilbert-Elliott model)."),
+        ("Losses per second follow a Poisson distribution (variance = mean)",
+         f"Rejected. Variance ÷ mean D = {st_D}, dispersion and χ² p < 0.05; the Negative Binomial wins on AIC.",
+         count_txt("poisson", "not Poisson (clumped)") + per_run(lambda s: f"D = {s['D']:.2f}, dispersion {peq(s['disp_p'])}"),
+         "Bursts pile many losses into a few seconds and leave the rest empty, so the counts spread out more than Poisson allows. "
+         "A Negative Binomial is a Poisson whose rate itself changes (Good vs Bad state), which is exactly that."),
+        ("The time between losses is exponential",
+         "Rejected for all three (bootstrap KS p < 0.0005). A two-phase mixture fits: short gaps inside bursts, long gaps between.",
+         count_txt("gaps", "not exponential") + per_run(lambda s: f"KS {peq(s['ks_p'], s.get('ks_B'))}"),
+         "An exponential has one time scale. Bursty loss has two: milliseconds inside a burst and seconds between bursts, "
+         "so the curve drops fast and then flattens."),
+        ("The usual 95% interval for the loss rate can be trusted",
+         f"No. It held the true rate only {st_cn} of the time. The design-effect interval restored {st_ca}.",
+         count_txt("interval", "usual 95% interval too narrow") + per_run(
+             lambda s: f"deff = {s['deff']:.2f}, naive {pct(s.get('cov_naive'), 0)} vs adjusted {pct(s.get('cov_adjusted'), 0)}"),
+         "The usual formula counts every packet as separate evidence. Packets in the same burst share one fate, so the real "
+         "amount of information is n ÷ deff. Too much confidence makes the interval too narrow."),
+        ("All networks lose packets at the same rate",
+         "Rejected: Kruskal-Wallis H = 937, every pair different after Bonferroni.",
+         kw_txt,
+         "Each link has different causes of loss: a cable rarely drops packets, a crowded Wi-Fi channel and a cellular link do."),
+        ("A short capture is enough to see the bursts",
+         f"Not on a good link. The runs test needs about: {pw_txt} to reach power {C.POWER_TARGET:g}.",
+         per_run(lambda s: f"{nice_dur(s['duration_s'])} recorded, runs-test power at that length {power_at(s['name']):.2f}"),
+         "Bursts are rare events. On a clean link a short run may hold no burst at all, so there is nothing to detect. "
+         "Power grows with length, which is why 10 minutes is recommended."),
+        ("The flat Beta(1, 1) prior does not bias the estimate",
+         "Held. The prior is worth one loss and one delivery against 180,000 packets.",
+         "; ".join(f"{k}: prior worth 2 packets vs {RS[k]['packets']:,} measured" for k in names),
+         "With thousands of packets the data swamp the prior, so Bayesian and plain estimates agree; the prior only matters in the first seconds."),
+    ]
+    for i, (assumed, study, yours, why) in enumerate(ITEMS, 1):
+        with st.container(border=True):
+            st.markdown(f"**{i}. {assumed}**")
+            a1, a2, a3 = st.columns(3)
+            a1.markdown("*We assumed*  \n" + assumed)
+            a2.markdown("*Case study (Phase 1) found*  \n" + study)
+            a3.markdown("*Your runs (Phase 2) show*  \n" + yours)
+            explain("<b>Why:</b> " + why)
+
+# ------------------------------------------------------------------ tab: saved runs
+def _show_in_tabs(path):
+    if path not in st.session_state.get("chosen", []):
+        st.session_state["chosen"] = st.session_state.get("chosen", []) + [path]
+
+
+def _delete(run_id, path):
+    RL.delete_run(run_id)
+    st.session_state["chosen"] = [p for p in st.session_state.get("chosen", []) if p != path]
+
+
+with T["saved"]:
+    st.subheader("Save a run")
+    with st.form("save_any", border=True):
+        s1, s2, s3 = st.columns([1, 1, 2])
+        pick = s1.selectbox("Run", names)
+        nm = s2.text_input("Name", placeholder="e.g. Hostel Wi-Fi, evening")
+        nt = s3.text_input("Note", placeholder="where, when, anything unusual")
+        if st.form_submit_button("💾 Save", type="primary"):
+            RL.save_run(KEY2PATH[pick], nm or pick, nt, RS[pick])
+            st.success(f"Saved “{nm or pick}”.")
+    st.caption(f"Saved runs are kept in `{os.path.relpath(RL.folder(), ROOT)}` with their packets and results, "
+               "and can be picked in the sidebar (marked 💾) like any capture.")
+
+    runs = RL.list_runs()
+    st.subheader(f"Saved runs ({len(runs)})")
+    if not runs:
+        st.info("Nothing saved yet. Record a run and press **💾 Save run**, or save any run above.")
+    else:
+        tbl = pd.DataFrame([{
+            "Name": r_["name"], "Network": r_.get("network"), "Recorded": r_.get("captured", "")[:16].replace("T", " "),
+            "Length": nice_dur(r_["duration_s"]), "Packets": r_["packets"], "Lost": r_["losses"],
+            "Loss rate": pct(r_["loss_rate"], 3), "95% interval": fmt_ci(r_["ci"]),
+            "b/a": round(r_["ba"], 1) if "ba" in r_ else None, "Mean burst": round(r_["mean_burst"], 2) if "mean_burst" in r_ else None,
+            "Design effect": round(r_["deff"], 2) if "deff" in r_ else None, "Verdict": VERDICT_TXT[r_["verdict"]],
+            "Note": r_.get("note", ""), "Saved": r_.get("saved_at", "")[:16].replace("T", " ")} for r_ in runs])
+        st.dataframe(tbl, hide_index=True, width="stretch")
+        st.download_button("⬇️ Download this table (CSV)", tbl.to_csv(index=False).encode(), "saved_runs.csv", "text/csv")
+
+        vcol = alt.Scale(domain=list(VERDICT_TXT.values()), range=[BAD, GOOD, GREY])
+        dfr = pd.DataFrame([dict(name=r_["name"], rate=100 * r_["loss_rate"], lo=100 * r_["ci"][0], hi=100 * r_["ci"][1],
+                                 verdict=VERDICT_TXT[r_["verdict"]], ba=r_.get("ba")) for r_ in runs])
+        g1, g2 = st.columns(2)
+        with g1:
+            st.markdown("**Loss rate of each saved run (95% interval)**")
+            base = alt.Chart(dfr).encode(y=alt.Y("name:N", title=None), color=alt.Color("verdict:N", scale=vcol, legend=None))
+            st.altair_chart((base.mark_rule(strokeWidth=4).encode(x=alt.X("lo:Q", title="loss rate (%)"), x2="hi:Q") +
+                             base.mark_point(filled=True, size=110).encode(x="rate:Q", tooltip=["name", "rate", "lo", "hi", "verdict"]))
+                            .properties(height=50 * len(dfr) + 40), width="stretch")
+        with g2:
+            st.markdown("**How much a loss pulls in the next (b/a, log scale)**")
+            dba = dfr.dropna(subset=["ba"])
+            if len(dba):
+                dba = dba.assign(one=1.0)
+                bb = alt.Chart(dba).encode(y=alt.Y("name:N", title=None), color=alt.Color("verdict:N", scale=vcol, legend=None))
+                st.altair_chart((bb.mark_rule(strokeWidth=4).encode(x=alt.X("one:Q", title="b/a (1 = independent), log scale",
+                                                                            scale=alt.Scale(type="log")), x2="ba:Q") +
+                    bb.mark_point(filled=True, size=110).encode(x="ba:Q", tooltip=["name", alt.Tooltip("ba:Q", format=".1f")]) +
+                    alt.Chart(pd.DataFrame({"x": [1]})).mark_rule(color="black", strokeDash=[4, 4]).encode(x="x:Q"))
+                    .properties(height=50 * len(dba) + 40), width="stretch")
+            else:
+                st.caption("No saved run has enough losses for b/a yet.")
+
+        st.markdown("**Open or delete a saved run**")
+        by_id = {r_["id"]: r_ for r_ in runs}
+        sel = st.selectbox("Saved run", list(by_id), format_func=lambda i: f"{by_id[i]['name']}  ·  {by_id[i].get('captured', '')[:16].replace('T', ' ')}")
+        r_ = by_id[sel]
+        parts = [f"<span>Loss rate <b>{pct(r_['loss_rate'], 3)}</b> {fmt_ci(r_['ci'])}</span>",
+                 f"<span><b>{r_['losses']:,}</b> of {r_['packets']:,} lost</span>", f"<span>{nice_dur(r_['duration_s'])}</span>"]
+        if "ba" in r_:
+            parts += [f"<span>Next loss <b>{r_['ba']:.1f}×</b> likelier after a loss</span>",
+                      f"<span>Design effect <b>{r_['deff']:.2f}</b></span>",
+                      f"<span>Runs {peq(r_['runs_p'])}</span>", f"<span>Var ÷ mean {r_['D']:.2f}</span>"]
+        if r_.get("note"):
+            parts.append(f"<span>📝 {r_['note']}</span>")
+        st.markdown(f'<div class="net {r_["verdict"]}"><h4>{r_["name"]}: {VERDICT_TXT[r_["verdict"]]}</h4>'
+                    f'<div class="row">{"".join(parts)}</div></div>', unsafe_allow_html=True)
+        b1, b2, b3 = st.columns([1, 1, 2])
+        b1.button("📈 Show in all tabs", key=f"open_{sel}", on_click=_show_in_tabs, args=(r_["csv"],),
+                  help="Adds this run to the sidebar selection so every tab analyses it.")
+        sure = b3.checkbox("Yes, delete it for good", key=f"sure_{sel}")
+        b2.button("🗑️ Delete", key=f"del_{sel}", disabled=not sure, on_click=_delete, args=(sel, r_["csv"]))
