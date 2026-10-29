@@ -168,7 +168,7 @@ const arrowDown = (s, x, y, h) => s.addShape(S.LINE, { x, y, w: 0, h, line: { co
     ["Project title:", "Statistical Modelling of Packet-Loss Patterns in Computer Networks"],
     ["Focus:", "Distribution fitting, tests of independence and Bayesian estimation"],
     ["Tracks:", "Track 3 (core), Track 1 and Track 5 (supporting)"],
-    ["Stage:", FINAL ? "Final review (Phase 1 complete: simulation study)" : "Review 1 (Phase 1: simulation study)"],
+    ["Stage:", FINAL ? "Final review (Phase 1 simulation study, Phase 2 real-network lab)" : "Review 1 (Phase 1: simulation study)"],
   ], { fontSize: 15, paraSpaceAfter: 7 });
   text(s, 0.6, 4.45, 6.6, 0.3, "TEAM", { fontSize: 13, bold: true, color: NAVY });
   TEAM.forEach(([name, reg], i) => {
@@ -207,11 +207,13 @@ if (FINAL) {
   col(4.67, "Added since", "FFFFFF", [
     ["Testing:", "automated tests for edge cases, correctness and reproducibility."],
     ["Fixes:", "empty traces and zero-loss cases now handled safely."],
-    ["Web app:", "Packet-Loss Lab, to explore the results live."],
-    ["IEEE paper:", "six-page conference paper with all results."],
+    ["Phase 2:", "real-packet probe and the Real Network Lab."],
+    ["Web app:", "Packet-Loss Lab with live and simulated pages."],
+    ["IEEE paper:", "seven-page conference paper with all results."],
   ]);
   col(8.93, "Final deliverables", "FFFFFF", [
     ["Code:", "one Python pipeline, public on GitHub."],
+    ["Lab:", "streamlit run lab.py records and analyses real runs."],
     ["Results:", "7 figures, results.json and summary.md."],
     ["Paper:", "IEEE format, PDF and Word."],
     ["Slides:", "this deck, built from the same data."],
@@ -219,7 +221,7 @@ if (FINAL) {
   stat(s, 0.4, 5.35, 3.0, 1.5, num(CFG.packets * N_NET), "packets analysed", T.blue, NAVY);
   stat(s, 3.57, 5.35, 3.0, 1.5, num(CFG.power_reps), "simulated captures per Monte Carlo point", T.peach, NETCOL[1]);
   stat(s, 6.75, 5.35, 3.0, 1.5, String(CFG.seed), "seed: every number reproducible", T.green, GOOD);
-  stat(s, 9.93, 5.35, 3.0, 1.5, "6 pages", "IEEE conference paper", T.rose, NETCOL[2]);
+  stat(s, 9.93, 5.35, 3.0, 1.5, "7 pages", "IEEE conference paper", T.rose, NETCOL[2]);
 }
 
 // =====================================================================
@@ -620,6 +622,89 @@ if (FINAL) {
   pill(s, 7.9, 5.75, 5.03, 1.15, "RECOMMENDATION FOR PHASE 2", `Record at least ${minutes(recDur)} per network. At this length every test has power of at least ${recMinPower.toFixed(2)}.`, T.green);
 }
 
+
+// =====================================================================
+// Final only: Phase 2, real networks
+if (FINAL) {
+  const s = base("PHASE 2: MEASURING REAL NETWORKS", null,
+    `Phase 2 takes the study onto real networks. The laptop sends ${CFG.packet_rate} numbered packets per second, like a voice call, and waits up to 2 seconds for each reply. No reply means lost. That gives the same 0/1 sequence as the simulation, so every Phase 1 method runs on it unchanged. To check the tool, we ran a test server on the laptop that dropped replies on purpose: once in bursts, once at random, both near 1.2%. The tool gave opposite verdicts at the same loss rate, which is exactly what it must do. These two runs are a validation, not a real network.`);
+  panel(s, 0.4, 1.1, 5.2, 5.8, "How a real run works");
+  const steps = [
+    ["1. Send", `${CFG.packet_rate} numbered packets per second (one every 20 ms) to the router by ICMP ping, or by UDP to an echo server.`, T.blue],
+    ["2. Match", "Each reply is matched to its packet by sequence number; the round-trip time is stored."],
+    ["3. Decide", "No reply within 2 s means the packet is lost.", T.rose],
+    ["4. Record", "The run becomes a 0/1 sequence, saved as CSV with its settings.", T.peach],
+    ["5. Analyse", "The Phase 1 pipeline (O1 to O6) runs on it automatically.", T.green],
+  ];
+  steps.forEach(([l, d, f], i) => { pill(s, 0.6, 1.6 + i * 1.04, 4.8, 0.86, l, d, f || "FFFFFF"); if (i < steps.length - 1) arrowDown(s, 3.0, 2.46 + i * 1.04, 0.18); });
+  panel(s, 5.85, 1.1, 7.08, 4.25, "Validation: same loss rate, bursty vs random");
+  table(s, [
+    ["Measure", "Test server: bursty drops", "Test server: random drops"],
+    ["Loss rate", "1.28% (77 of 6,000)", "1.22% (73 of 6,000)"],
+    ["Variance ÷ mean, D", "3.82", "0.92"],
+    ["Runs test z (p)", "−24.5 (< 10⁻¹⁰)", "−1.2 (0.231)"],
+    ["b/a", "36.8", "3.0"],
+    ["Design effect", "4.43", "1.00"],
+    ["Verdict", "Losses come in bursts", "No evidence of bursts"],
+  ], { x: 6.0, y: 1.58, w: 6.78, colW: [2.1, 2.34, 2.34], rowH: 0.44, fontSize: 13 });
+  text(s, 6.0, 4.98, 6.78, 0.3, "2-minute runs over the laptop's own loopback; the test server dropped replies on purpose.", { fontSize: 11, color: MUTED, align: "center" });
+  stat(s, 5.85, 5.55, 2.25, 1.35, `${CFG.packet_rate}/s`, "packets, voice-call rate", T.blue, NAVY);
+  stat(s, 8.27, 5.55, 2.25, 1.35, "2 s", "timeout for a reply", T.rose, NETCOL[2]);
+  stat(s, 10.68, 5.55, 2.25, 1.35, minutes(recDur), `per network: power ≥ ${recMinPower.toFixed(2)}`, T.green, GOOD);
+}
+
+if (FINAL) {
+  const s = base("REAL NETWORK LAB: THE FINAL PRODUCT", null,
+    `This is the final product of the project. One command opens it. You press Start recording, and when the run ends it calculates everything on its own and shows a verdict card for each network, then one tab per objective. The screenshot uses the two validation runs. A second page holds the Phase 1 simulation.`);
+  s.addImage({ path: path.join(__dirname, "assets", "p2_home.jpg"), x: 0.4, y: 1.1, w: 7.6, h: 4.26 });
+  s.addShape(S.RECTANGLE, { x: 0.4, y: 1.1, w: 7.6, h: 4.26, fill: { type: "none" }, line: { color: NAVY, width: 1 } });
+  text(s, 0.4, 5.42, 7.6, 0.3, "Home page with the two validation runs: one card per network, then a tab per objective.", { fontSize: 11, color: MUTED, align: "center" });
+  panel(s, 8.25, 1.1, 4.68, 4.62, "What it does by itself");
+  bullets(s, 8.4, 1.56, 4.4, 4.1, [
+    ["Record:", "pick the network, press Start; live loss rate on screen."],
+    ["Verdict cards:", "bursty or random, loss rate with 95% CrI, b/a, deff."],
+    ["O1 to O6 tabs:", "every fit, test and interval from Phase 1, as charts."],
+    ["Live vs study:", "each run set against the matching study network."],
+    ["Assumptions:", "what we assumed, what we found, and why."],
+    ["Saved runs:", "keep runs with a name and note; compare all."],
+    ["Read me:", "every formula and decision rule in the sidebar."],
+  ], { fontSize: 13, paraSpaceAfter: 6 });
+  pill(s, 0.4, 5.95, 6.15, 0.95, "RUN IT", "streamlit run lab.py   (from the project folder)", T.sand);
+  pill(s, 6.78, 5.95, 6.15, 0.95, "REPORT", "One click downloads a zip: summary tables, figures and raw data.", T.blue);
+}
+
+if (FINAL) {
+  const s = base("LIVE VS STUDY AND SAVED RUNS", null,
+    `While a run is recording, the loss rate and the after-a-loss multiplier appear live next to the case study's numbers. After the run, the Live vs study tab checks every test side by side and marks whether it tells the same story. Here the random-drop test server is set against the study's Wi-Fi: same loss level, but none of the burst checks match, as expected. Saved runs keep every result in one table.`);
+  s.addImage({ path: path.join(__dirname, "assets", "p2_live.jpg"), x: 0.4, y: 1.1, w: 6.1, h: 2.97 });
+  s.addShape(S.RECTANGLE, { x: 0.4, y: 1.1, w: 6.1, h: 2.97, fill: { type: "none" }, line: { color: NAVY, width: 1 } });
+  text(s, 0.4, 4.1, 6.1, 0.28, "While recording: live numbers against the study (dashed line)", { fontSize: 11, color: MUTED, align: "center" });
+  s.addImage({ path: path.join(__dirname, "assets", "p2_saved.jpg"), x: 0.4, y: 4.45, w: 6.1, h: 2.48 });
+  s.addShape(S.RECTANGLE, { x: 0.4, y: 4.45, w: 6.1, h: 2.48, fill: { type: "none" }, line: { color: NAVY, width: 1 } });
+  s.addImage({ path: path.join(__dirname, "assets", "p2_vs.jpg"), x: 6.75, y: 1.1, w: 6.18, h: 4.54 });
+  s.addShape(S.RECTANGLE, { x: 6.75, y: 1.1, w: 6.18, h: 4.54, fill: { type: "none" }, line: { color: NAVY, width: 1 } });
+  text(s, 6.75, 5.68, 6.18, 0.28, "After the run: every test side by side, with a same-story check", { fontSize: 11, color: MUTED, align: "center" });
+  pill(s, 6.75, 6.05, 6.18, 0.85, "SAVED RUNS (BOTTOM LEFT)", "Each run kept with its packets, results and note; reopen or delete any time.", T.green);
+}
+
+if (FINAL) {
+  const kd = (k) => RS(k).descriptive.window_var / RS(k).descriptive.window_mean;
+  const [dMin, dMax] = range(KEYS, kd);
+  const slowK = KEYS.reduce((a, k) => ((firstAt(R.power[k].runs, PT) || 1e9) > (firstAt(R.power[a].runs, PT) || 1e9) ? k : a));
+  const s = base("WHAT WE ASSUMED VS WHAT WE FOUND", null,
+    `Each row is a textbook assumption. The middle column is what the case study showed, and the last column is the reason. The Lab shows the same table with a fourth column filled in from each real run, so Phase 2 can confirm or challenge every row.`);
+  table(s, [
+    ["We assumed", "The case study found", "Why"],
+    ["Losses are independent", `Rejected: a loss makes the next ${ampMin.toFixed(0)} to ${ampMax.toFixed(0)}× likelier (p < 10⁻¹⁰).`, "Interference and full queues outlast the 20 ms between packets; the channel has memory."],
+    ["Losses per second are Poisson", `Rejected: variance ÷ mean ${dMin.toFixed(2)} to ${dMax.toFixed(2)}; Negative Binomial wins.`, "Bursts pile losses into a few seconds and leave the rest empty."],
+    ["Gaps between losses are exponential", "Rejected (KS p < 0.0005); a two-phase mixture fits.", "Two time scales: milliseconds inside a burst, seconds between bursts."],
+    ["The usual 95% interval is fine", `Held the truth only ${pc(covNMin, 0)} to ${pc(covNMax, 0)} of the time; corrected ${pc(covAMin, 0)} to ${pc(covAMax, 0)}.`, "Packets in a burst share one fate, so n ÷ deff is the real sample size."],
+    ["All networks lose at the same rate", `Rejected: Kruskal-Wallis H = ${R.comparison.kruskal_H.toFixed(0)}, every pair differs.`, "Each link has different causes and amounts of loss."],
+    ["A short capture is enough", `${SHORT[slowK]} needs about ${minutes(firstAt(R.power[slowK].runs, PT))} for power ${PT}.`, "Bursts are rare on a good link; power grows with length."],
+  ], { x: 0.4, y: 1.1, w: 12.53, colW: [3.0, 4.75, 4.78], rowH: 0.66, fontSize: 13, leftCols: [1, 2] });
+  pill(s, 0.4, 6.3, 12.53, 0.6, "PHASE 2", "The Lab's Assumptions tab adds a fourth column with what each real run shows.", T.green);
+}
+
 // =====================================================================
 // Final only: discussion
 if (FINAL) {
@@ -659,7 +744,7 @@ if (FINAL) {
   panel(s, 0.4, 1.1, 12.53, 5.8, "Limits of this study and how we handle them");
   table(s, [
     ["Limitation", "Why it matters", "How we handle it"],
-    ["Data are simulated", "Real links may add effects, such as busy hours.", "Phase 2 runs the same code on real captures."],
+    ["Phase 1 data are simulated", "Real links may add effects, such as busy hours.", "Phase 2 lab runs the same code on real packets."],
     ["Dispersion test uses a Poisson baseline", `Counts of ${PPW} packets are Binomial, a little less spread out.`, "The test can only under-state burstiness, never over-state it."],
     ["Runs and Markov tests are approximate", "In very short captures the false-alarm rate can drift from 5%.", `Our traces last ${minutes(CFG.duration_s)}, where the rate is close to 5%.`],
     ["Tail models are not perfect", "Negative Binomial and two-phase fits are still rejected for some networks.", "Future work: hidden Markov and three-phase models."],
@@ -672,7 +757,7 @@ if (FINAL) {
 // Final only: the web app
 if (FINAL) {
   const wifi = KEYS.find((k) => k === SEQ) || KEYS[0];
-  const s = base("PACKET-LOSS LAB: WEB APP", null,
+  const s = base("PACKET-LOSS LAB: SIMULATION PAGE", null,
     `The app runs the same code as the study. Its default view reproduces our ${SHORT[wifi]} results exactly. In the demo we show the red loss squares, then switch to coin-flip mode, then compare the two intervals.`);
   panel(s, 0.4, 1.1, 4.4, 5.8, "What you can do");
   bullets(s, 0.55, 1.58, 4.1, 3.4, [
@@ -693,7 +778,7 @@ if (FINAL) {
   stat(s, 5.05, 4.65, 2.5, 1.1, num(d.losses), `${SHORT[wifi]} losses, same as the study`, T.blue, NAVY);
   stat(s, 7.74, 4.65, 2.5, 1.1, RS(wifi).bayes.markov.amp_q[1].toFixed(0) + "×", "likelier after a loss", T.rose, NETCOL[2]);
   stat(s, 10.43, 4.65, 2.5, 1.1, String(CFG.seed), "default seed", T.green, GOOD);
-  pill(s, 5.05, 5.95, 7.88, 0.95, "RUN IT", "streamlit run app.py, from the project folder. It opens in the browser.", T.sand);
+  pill(s, 5.05, 5.95, 7.88, 0.95, "RUN IT", "streamlit run lab.py, then pick Simulation Lab (Phase 1) in the sidebar.", T.sand);
 }
 
 // =====================================================================
@@ -712,7 +797,7 @@ if (FINAL) {
   ], { fontSize: 15, paraSpaceAfter: 10 });
   panel(s, 6.78, 1.1, 6.15, 3.55, "Future work");
   bullets(s, 6.93, 1.58, 5.85, 3.0, [
-    ["Measured data:", `${CFG.packet_rate} packets/s streams on wired, Wi-Fi and mobile links.`],
+    [FINAL ? "Real runs:" : "Measured data:", FINAL ? `${minutes(recDur)} each on Wi-Fi, hotspot and wired with the Real Network Lab.` : `${CFG.packet_rate} packets/s streams on wired, Wi-Fi and mobile links.`],
     ["Calibration:", "estimate the two-state model with the Baum-Welch algorithm."],
     ["Tail models:", "three-phase mixtures or a hidden Markov model."],
     ["Hierarchical Bayes:", "pool across networks, with Phase 1 results as priors."],
@@ -730,7 +815,7 @@ if (FINAL) {
     s.addShape(S.ROUNDED_RECTANGLE, { x: x + 0.04, y, w: w - 0.08, h: 0.36, rectRadius: 0.08, fill: { color: fill }, line: { color: col, width: 1 } });
     text(s, x + 0.15, y, w - 0.3, 0.36, label, { fontSize: 12, bold: true, color: col === NAVY ? "FFFFFF" : col, valign: "middle" });
   };
-  bar(0, 2, 5.55, `Record traces, ${minutes(recDur)} each`, NAVY, NAVY);
+  bar(0, 2, 5.55, FINAL ? `Record real runs in the Lab, ${minutes(recDur)} each` : `Record traces, ${minutes(recDur)} each`, NAVY, NAVY);
   bar(2, 5, 5.98, "Baum-Welch fit and repeat the analysis", T.sand, "7A5A00");
   bar(5, 8, 6.41, "Hierarchical model, time of day, report", T.green, GOOD);
 }
@@ -767,7 +852,7 @@ if (FINAL) {
   pill(s, 9.1, 1.1, 3.83, 1.6, "USE OF SOURCES", "Loss model [1, 2, 3]. EM algorithm [4]. Tests [5 to 9]. AIC [10]. Design effect [11]. Bayesian methods [12]. Software [13 to 15].", T.sand);
   pill(s, 9.1, 2.9, 3.83, 1.25, FINAL ? "PAPER AND CODE" : "REPRODUCIBILITY", FINAL ? `IEEE paper in the paper folder. Seed ${CFG.seed} regenerates every number.` : `Seed ${CFG.seed}. Running run_case_study.py regenerates all results.`, T.green);
   pill(s, 9.1, 4.35, 3.83, 1.25, "SOURCE CODE", "github.com/AashmanBiyani08/Prob_Stats_Project", T.blue);
-  pill(s, 9.1, 5.8, 3.83, 1.1, "DATA", "Phase 1 traces are simulated. No measured data is used yet.", T.rose);
+  pill(s, 9.1, 5.8, 3.83, 1.1, "DATA", FINAL ? "Phase 1 traces are simulated. Phase 2 measures real packets; validated on a test server." : "Phase 1 traces are simulated. No measured data is used yet.", T.rose);
 }
 
 // =====================================================================
@@ -801,6 +886,32 @@ if (FINAL) {
   table(s, [["Short", "Full form", "Plain meaning"], ...L], { x: 0.5, y: 1.55, w: 5.95, colW: [0.85, 2.3, 2.8], rowH: 0.52, fontSize: 11, leftCols: [1, 2] });
   panel(s, 6.78, 1.1, 6.15, 5.8, "Tests and inference");
   table(s, [["Short", "Full form", "Plain meaning"], ...Rr], { x: 6.88, y: 1.55, w: 5.95, colW: [1.15, 2.2, 2.6], rowH: 0.52, fontSize: 11, leftCols: [1, 2] });
+}
+
+// Final only: Phase 2 terms
+if (FINAL) {
+  const s = base("APPENDIX: PHASE 2 TERMS", null,
+    `Short forms and terms used on the Phase 2 slides, with a plain meaning for each.`);
+  const L = [
+    ["ICMP", "Internet Control Message Protocol", "The protocol behind ping; the router replies"],
+    ["UDP", "User Datagram Protocol", "Plain packets to our own echo server"],
+    ["RTT", "Round-trip time", "Time for a reply to come back (ms)"],
+    ["Echo server", "Program that sends packets back", "Used for UDP mode and the validation test"],
+    ["Timeout", "2 s wait for a reply", "No reply in time: the packet counts as lost"],
+    ["Router / gateway", "First hop of the network", "Probing it measures the Wi-Fi link itself"],
+  ];
+  const Rr = [
+    ["Probe", "probe.py", "Sends the packets and records replies"],
+    ["Run / capture", "One recording", "CSV of packets plus a JSON of settings"],
+    ["Verdict", "Bursty or no evidence", "Runs test or Markov test at α = 0.05"],
+    ["Live vs study", "Side-by-side check", "Real run against the matching study network"],
+    ["Same story", "Same test outcome", "Both reject, or both do not"],
+    ["Saved run", "Kept run with results", "Stored in realworld/saved_runs"],
+  ];
+  panel(s, 0.4, 1.1, 6.15, 5.8, "Measuring");
+  table(s, [["Term", "Full form", "Plain meaning"], ...L], { x: 0.5, y: 1.55, w: 5.95, colW: [1.25, 2.2, 2.5], rowH: 0.7, fontSize: 12, leftCols: [1, 2] });
+  panel(s, 6.78, 1.1, 6.15, 5.8, "The Lab");
+  table(s, [["Term", "Meaning", "Plain meaning"], ...Rr], { x: 6.88, y: 1.55, w: 5.95, colW: [1.35, 2.0, 2.6], rowH: 0.7, fontSize: 12, leftCols: [1, 2] });
 }
 
 const out = ARGS.filter((a) => !a.startsWith("--"))[0] || path.join(__dirname, "..", "..", "Packet_Loss_Case_Study_Review1.pptx");
