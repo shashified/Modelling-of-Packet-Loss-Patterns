@@ -101,7 +101,7 @@ def posteriors(posts, seq, labels, path, seq_label=""):
     _save(fig, path)
 
 
-def markov_posteriors(mpost, labels, path):
+def markov_posteriors(mpost, labels, path, title="A loss makes the next loss tens of times more likely"):
     """Forest plot: posterior median and 95% interval of P(L|N) and P(L|L) per network."""
     fig, ax = plt.subplots(figsize=(9, 3.6))
     keys = list(mpost)
@@ -117,7 +117,7 @@ def markov_posteriors(mpost, labels, path):
     ax.set_yticks(range(len(keys))); ax.set_yticklabels([labels[k] for k in keys])
     ax.set_xscale("log"); ax.set_xlabel("probability (%), posterior median with 95% credible interval")
     ax.set_ylim(-0.6, len(keys) - 0.3)
-    ax.set_title("A loss makes the next loss tens of times more likely")
+    ax.set_title(title)
     ax.legend(fontsize=8, loc="lower right")
     _save(fig, path)
 

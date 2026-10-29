@@ -215,7 +215,8 @@ Built from the data by `paper/build_paper.py` (LaTeX, IEEEtran, 8 pages) and `pa
 ### 8.1b Final review deck (DONE, 22 Oct)
 `node slides/build_deck.js Packet_Loss_Case_Study_Final.pptx --final` builds 21 slides: the 16 Review 1 slides (header now "Final Review") plus Progress since Review 1 (slide 2), Discussion, Limitations, Packet-Loss Lab web app (screenshots in `slides/assets/`), and an Appendix of abbreviations. Without `--final` the Review 1 deck is rebuilt unchanged (text checked identical to the presented copy).
 
-### 8.2 Phase 2 (future work, not started)
+### 8.2 Phase 2 (tools ready, 29 Oct; captures not yet taken)
+`realworld/probe.py` (stdlib only, no root on macOS/Linux) sends 50 packets/s by ICMP to the router or a host, or by UDP to `realworld/echo_server.py`, and saves one CSV row per packet plus a JSON of settings. `realworld/analyze_captures.py` runs the Phase 1 fits, tests, Bayesian estimates and design effect on the captures and writes `realworld/results/summary.md` and four figures. Guide: `realworld/README.md`. Tested end to end with real packets over loopback (a bursty-drop echo server and an independent-drop one at the same ~1.2% rate were told apart correctly); `tests/test_realworld.py` adds 4 tests (41 total). Next: 10-minute captures on Wi-Fi, hotspot and wired from a team laptop. Loss is round-trip. Original Phase 2 plan, still open beyond the captures:
 Real captures at 50 packets/s, ≥ 10 min per network; Baum-Welch estimation of Gilbert-Elliott parameters; 3-phase / HMM tail models; hierarchical Bayes across networks with Phase 1 posteriors as priors; peak vs off-peak loss rates.
 
 ### 8.3 Small optional items

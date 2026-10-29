@@ -98,6 +98,15 @@ python3 paper/make_docx.py     # writes paper/Packet_Loss_IEEE_Paper.docx (needs
 
 For Overleaf, upload `paper/Packet_Loss_IEEE_Paper.tex`, `paper/IEEEtran.cls` and the `paper/figures/` folder.
 
+## Phase 2: real network measurements
+
+`realworld/probe.py` sends 50 packets per second over a real network (Wi-Fi, phone hotspot, wired) and records which are lost; `realworld/analyze_captures.py` runs the Phase 1 statistics on the captures. Step-by-step guide: [realworld/README.md](realworld/README.md).
+
+```bash
+caffeinate -i python3 realworld/probe.py --label wifi --target gateway --duration 600
+python3 realworld/analyze_captures.py --latest
+```
+
 ## Known limitations
 
 - The index-of-dispersion test compares counts with a Poisson law. Counts of 50 independent packets are Binomial, whose variance is slightly below the mean, so the test is conservative: under independence it rejects about 1% of the time instead of 5%. It never over-states burstiness.
