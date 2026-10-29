@@ -4,6 +4,7 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{stfloats}
+\usepackage{cite}
 \usepackage[hidelinks]{hyperref}
 \graphicspath{{figures/}}
 \renewcommand{\arraystretch}{1.12}
@@ -57,11 +58,11 @@ Our aim was to find out how badly independence fails, which standard tests pick 
 The report is organised as follows. Section~II gives some background, Section~III sets out the loss model and how the data were generated, Section~IV describes the statistical methods and Section~V reports the results. Section~VI discusses what the results mean and where the study is limited, and Section~VII concludes.
 
 \section{Background}
-Modelling bursty errors with a hidden two-state chain goes back to E.~N.~Gilbert, who used it for errors on telephone lines in 1960. In 1963 E.~O.~Elliott extended the model so that errors could occur in either state. The Gilbert-Elliott model that came out of this is still the usual starting point for bursty loss.
+Modelling bursty errors with a hidden two-state chain goes back to E.~N.~Gilbert, who used it for errors on telephone lines in 1960 \cite{gilbert1960}. In 1963 E.~O.~Elliott extended the model so that errors could occur in either state \cite{elliott1963}. The Gilbert-Elliott model that came out of this is still the usual starting point for bursty loss.
 
-It has also been known for many years that Internet losses are not independent. Measurement studies in the 1990s showed that probe packets sent close together were often lost together, and that losses in TCP transfers came in correlated episodes. The timing of loss in multicast traces could be described reasonably well with Markov chains. Later studies fitted Gilbert models to voice traffic and related the length of a loss burst to how poor a call sounds.
+It has also been known for many years that Internet losses are not independent. Measurement studies in the 1990s showed that probe packets sent close together were often lost together \cite{bolot1993}, and that losses in TCP transfers came in correlated episodes \cite{paxson1997}. The timing of loss in multicast traces could be described reasonably well with Markov chains \cite{yajnik1999}. Later studies fitted Gilbert models to voice traffic and related the length of a loss burst to how poor a call sounds \cite{jiang2000,hasslinger2008}.
 
-Most of this earlier work sets out to describe the loss process. Our interest is more statistical. We want to know which standard tests detect the dependence, how much data they need before they do, and how far ordinary interval estimates drift from the truth when the dependence is ignored. For the last of these we use the design effect from survey sampling, where it corrects for people being sampled in clusters instead of one at a time.
+Most of this earlier work sets out to describe the loss process. Our interest is more statistical. We want to know which standard tests detect the dependence, how much data they need before they do, and how far ordinary interval estimates drift from the truth when the dependence is ignored. For the last of these we use the design effect from survey sampling \cite{kish1965}, where it corrects for people being sampled in clusters instead of one at a time.
 
 \section{Loss Model and Data}
 \subsection{The Gilbert-Elliott Channel}
@@ -115,15 +116,15 @@ For the gaps between losses we begin with the exponential distribution, with $\h
 \begin{equation}
 f(t)=w\lambda_1e^{-\lambda_1t}+(1-w)\lambda_2e^{-\lambda_2t}.
 \end{equation}
-The idea behind the mixture is that gaps come in two types. Short gaps, with the fast rate $\lambda_1$, occur within a burst. Long gaps, with the slow rate $\lambda_2$, occur between bursts. We never know which type a particular gap is, so we fit the mixture with the Expectation-Maximisation (EM) algorithm. In each iteration the E-step works out the probability that each gap is a short one, and the M-step updates $w$, $\lambda_1$ and $\lambda_2$ with these probabilities as weights. We stop once the fit no longer improves. Models are compared with the Akaike Information Criterion, $\text{AIC}=2k-2\ln L$. It rewards a good fit but adds a penalty for each extra parameter, so a lower value means a better model.
+The idea behind the mixture is that gaps come in two types. Short gaps, with the fast rate $\lambda_1$, occur within a burst. Long gaps, with the slow rate $\lambda_2$, occur between bursts. We never know which type a particular gap is, so we fit the mixture with the Expectation-Maximisation (EM) algorithm \cite{dempster1977}. In each iteration the E-step works out the probability that each gap is a short one, and the M-step updates $w$, $\lambda_1$ and $\lambda_2$ with these probabilities as weights. We stop once the fit no longer improves. Models are compared with the Akaike Information Criterion, $\text{AIC}=2k-2\ln L$ \cite{akaike1974}. It rewards a good fit but adds a penalty for each extra parameter, so a lower value means a better model.
 
 \subsection{Goodness of Fit}
 We evaluate the goodness of fit by comparing the observed and expected number of seconds with $k$ losses under each model using the Pearson statistic $\chi^2=\sum_i (O_i-E_i)^2/E_i$. The test is unreliable when expected counts in the tail are small, so tail bins are merged until every expected count is at least 5. The degrees of freedom are the number of bins, minus one, minus the number of fitted parameters. We also check the Poisson assumption by using the index-of-dispersion test. In a Poisson distribution, the variance equals the mean. The test statistic is $(n-1)s^2/\bar x$ and follows a $\chi^2_{n-1}$ distribution. A variance which is greater than the mean indicates overdispersion and produces a large statistic value.
 
-For the gaps between losses, the goodness of fit is assessed using the Kolmogorov-Smirnov (KS) distance test $D=\sup_t|F_n(t)-F(t)|$, which measures the maximum difference between the data curve and the model curve. One complication is that the standard KS tables assume the model was fixed before the data were seen. Here the rate is estimated from the same data, which makes the fit look better than it is and leaves the textbook p-value too large. Parametric bootstrap is used to get the p-value instead. Synthetic datasets are generated from the fitted model, the model parameters are re-estimated and the $D$ value is recomputed. This procedure is conducted 2,000 times for the exponential and 500 times for the mixture models because the Expectation-Maximisation (EM) refit is rather slow. This gives the range of $D$ to expect if the model is correct.
+For the gaps between losses, the goodness of fit is assessed using the Kolmogorov-Smirnov (KS) distance test $D=\sup_t|F_n(t)-F(t)|$, which measures the maximum difference between the data curve and the model curve. One complication is that the standard KS tables assume the model was fixed before the data were seen. Here the rate is estimated from the same data, which makes the fit look better than it is and leaves the textbook p-value too large \cite{lilliefors1969}. Parametric bootstrap is used to get the p-value instead \cite{efron1993}. Synthetic datasets are generated from the fitted model, the model parameters are re-estimated and the $D$ value is recomputed. This procedure is conducted 2,000 times for the exponential and 500 times for the mixture models because the Expectation-Maximisation (EM) refit is rather slow. This gives the range of $D$ to expect if the model is correct.
 
 \subsection{Testing Independence}
-A run is a sequence of same outcomes. For example, 0\,0\,1\,1\,0\,0\,0 has 3 runs. The Wald-Wolfowitz runs test works exactly like this and counts the number of runs $R$. With $n_1$ losses and $n_0$ deliveries, independence gives
+A run is a sequence of same outcomes. For example, 0\,0\,1\,1\,0\,0\,0 has 3 runs. The Wald-Wolfowitz runs test \cite{wald1940} works exactly like this and counts the number of runs $R$. With $n_1$ losses and $n_0$ deliveries, independence gives
 \begin{equation}
 E[R]=\frac{2n_1n_0}{n}+1,\quad \operatorname{Var}(R)=\frac{2n_1n_0(2n_1n_0-n)}{n^2(n-1)} .
 \end{equation}
@@ -136,12 +137,12 @@ The Markov-chain test asks the question more directly: does the outcome for one 
 \begin{equation}
 G^2=2(\ln L_1-\ln L_0).
 \end{equation}
-Because $H_1$ has one parameter more than $H_0$, Wilks' theorem says that $G^2$ is approximately $\chi^2_1$ when $H_0$ holds. The two estimates are useful on their own as well. The ratio $b/a$ measures how much a loss raises the chance of the next loss, and $1/(1-b)$ gives the mean burst length.
+Because $H_1$ has one parameter more than $H_0$, Wilks' theorem \cite{wilks1938} says that $G^2$ is approximately $\chi^2_1$ when $H_0$ holds. The two estimates are useful on their own as well. The ratio $b/a$ measures how much a loss raises the chance of the next loss, and $1/(1-b)$ gives the mean burst length.
 
-The three networks are compared with rank-based tests, since the counts are mostly zero, strongly skewed and far from normal. The Kruskal-Wallis test compares all three networks together. To ensure that running three tests at a time does not raise the false-alarm rate, pairwise Mann-Whitney tests are used to compare 3 pairs using a Bonferroni correction. A chi-square test of homogeneity on total lost and delivered packets checks whether all the networks have the same loss proportion or not. All tests use $\alpha=<<alpha>>$.
+The three networks are compared with rank-based tests, since the counts are mostly zero, strongly skewed and far from normal. The Kruskal-Wallis test \cite{kruskal1952} compares all three networks together. To ensure that running three tests at a time does not raise the false-alarm rate, pairwise Mann-Whitney tests \cite{mann1947} are used to compare 3 pairs using a Bonferroni correction. A chi-square test of homogeneity on total lost and delivered packets checks whether all the networks have the same loss proportion or not. All tests use $\alpha=<<alpha>>$.
 
 \subsection{Bayesian Estimation}
-We calculate the loss rate in the Bayesian manner. The prior used is flat, specifically $\text{Beta}(1,1)$, and this assumes that all possible loss rates between 0 and 1 are equally likely prior to any data being observed. Once $k$ losses have been observed among $n$ packets, the posterior distribution becomes $\text{Beta}(1+k,\,1+n-k)$, which means that updating the estimate simply requires adding the number of observed losses and deliveries to the initial counts in the prior. We give the mean of the posterior together with its 95\% credible interval, and in the case of Campus Wi-Fi we also illustrate how the posterior becomes narrower as more traffic is observed. To verify that the networks actually are arranged in order of loss rate, we take 200,000 samples from each posterior and then determine the proportion of those samples for which Wired $<$ Wi-Fi $<$ Mobile.
+We calculate the loss rate in the Bayesian manner \cite{gelman2013}. The prior used is flat, specifically $\text{Beta}(1,1)$, and this assumes that all possible loss rates between 0 and 1 are equally likely prior to any data being observed. Once $k$ losses have been observed among $n$ packets, the posterior distribution becomes $\text{Beta}(1+k,\,1+n-k)$, which means that updating the estimate simply requires adding the number of observed losses and deliveries to the initial counts in the prior. We give the mean of the posterior together with its 95\% credible interval, and in the case of Campus Wi-Fi we also illustrate how the posterior becomes narrower as more traffic is observed. To verify that the networks actually are arranged in order of loss rate, we take 200,000 samples from each posterior and then determine the proportion of those samples for which Wired $<$ Wi-Fi $<$ Mobile.
 
 The way in which the burst parameters are treated is the same. We place separate posteriors on $a$ and $b$, $a\sim\text{Beta}(1+n_{NL},1+n_{NN})$ and $b\sim\text{Beta}(1+n_{LL},1+n_{LN})$, and these give credible intervals for $b/a$ and for the burst length. To check the independent model, we use it to predict how frequently a window should contain at least five losses and then compare that frequency with the actual frequency at which it occurs.
 
@@ -229,7 +230,7 @@ The posterior medians of $b/a$ are <<list_amp>> for Wired, Wi-Fi and Mobile, so 
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.66\textwidth]{fig5_markov_posteriors.png}
+\includegraphics[width=0.72\textwidth]{fig5_markov_posteriors.png}
 \caption{Posterior medians and 95\% credible intervals for $P(L\mid N)$ (open) and $P(L\mid L)$ (filled). On all three networks a loss sharply raises the chance that the next packet is lost too.}
 \label{fig:markov}
 \end{figure*}
@@ -270,7 +271,7 @@ For us this is the key result. Across <<cov_reps>> simulated <<cov_min>>-minute 
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.56\textwidth]{fig7_interval_coverage.png}
+\includegraphics[width=0.62\textwidth]{fig7_interval_coverage.png}
 \caption{Share of nominal 95\% intervals that contain the true loss rate, before and after the design-effect correction.}
 \label{fig:coverage}
 \end{figure*}
@@ -332,9 +333,33 @@ There are some additional points too. The dispersion test is a bit conservative 
 \section{Conclusion and Future Work}
 We tested whether packet losses on <<n_scen>> simulated networks behave independently, and found that they do not. The Poisson and exponential models were rejected in every case. The per-second loss counts were <<list_D>> times more spread out than a Poisson model allows, the gaps split into short gaps within bursts and long quiet gaps between them, and each loss made the next one <<amp_lo>> to <<amp_hi>> times more likely. Most importantly, the standard 95\% interval for the loss rate was right in only <<covN_lo>> to <<covN_hi>> of cases. Dividing the sample size by the design effect raised this to between <<covA_lo>> and <<covA_hi>>.
 
-The next step is Phase 2. We will record steady streams of <<rate>> packets per second on real wired, Wi-Fi and mobile links, for at least ten minutes each, and run the same code on them. After that we would like to estimate the Gilbert-Elliott parameters directly from the real traces using the Baum-Welch algorithm, try richer models for the tail, use the Phase 1 results as priors in a hierarchical Bayesian model across the networks, and compare loss at peak and off-peak hours.
+The next step is Phase 2. We will record steady streams of <<rate>> packets per second on real wired, Wi-Fi and mobile links, for at least ten minutes each, and run the same code on them. After that we would like to estimate the Gilbert-Elliott parameters directly from the real traces using the Baum-Welch algorithm \cite{baum1970}, try richer models for the tail, use the Phase 1 results as priors in a hierarchical Bayesian model across the networks, and compare loss at peak and off-peak hours.
 
 \section*{Reproducibility}
-Every result in this report was produced by one Python pipeline, built on NumPy, SciPy and Matplotlib and run with seed <<seed>>. Running it again regenerates all of the tables and figures.
+Every result in this report was produced by one Python pipeline, built on NumPy \cite{numpy2020}, SciPy \cite{scipy2020} and Matplotlib \cite{matplotlib2007} and run with seed <<seed>>. Running it again regenerates all of the tables and figures.
+
+\begin{thebibliography}{99}
+\bibitem{gilbert1960} E. N. Gilbert, ``Capacity of a burst-noise channel,'' \emph{Bell Syst. Tech. J.}, vol. 39, no. 5, pp. 1253-1265, 1960.
+\bibitem{elliott1963} E. O. Elliott, ``Estimates of error rates for codes on burst-noise channels,'' \emph{Bell Syst. Tech. J.}, vol. 42, no. 5, pp. 1977-1997, 1963.
+\bibitem{bolot1993} J.-C. Bolot, ``End-to-end packet delay and loss behavior in the Internet,'' in \emph{Proc. ACM SIGCOMM}, 1993, pp. 289-298.
+\bibitem{paxson1997} V. Paxson, ``End-to-end Internet packet dynamics,'' in \emph{Proc. ACM SIGCOMM}, 1997, pp. 139-152.
+\bibitem{yajnik1999} M. Yajnik, S. Moon, J. Kurose, and D. Towsley, ``Measurement and modelling of the temporal dependence in packet loss,'' in \emph{Proc. IEEE INFOCOM}, 1999, pp. 345-352.
+\bibitem{jiang2000} W. Jiang and H. Schulzrinne, ``Modeling of packet loss and delay and their effect on real-time multimedia service quality,'' in \emph{Proc. NOSSDAV}, 2000.
+\bibitem{hasslinger2008} G. Hasslinger and O. Hohlfeld, ``The Gilbert-Elliott model for packet loss in real time services on the Internet,'' in \emph{Proc. 14th GI/ITG Conf. Measurement, Modelling and Evaluation of Computer and Communication Systems (MMB)}, 2008, pp. 269-286.
+\bibitem{dempster1977} A. P. Dempster, N. M. Laird, and D. B. Rubin, ``Maximum likelihood from incomplete data via the EM algorithm,'' \emph{J. Roy. Statist. Soc. B}, vol. 39, no. 1, pp. 1-38, 1977.
+\bibitem{akaike1974} H. Akaike, ``A new look at the statistical model identification,'' \emph{IEEE Trans. Autom. Control}, vol. 19, no. 6, pp. 716-723, 1974.
+\bibitem{lilliefors1969} H. W. Lilliefors, ``On the Kolmogorov-Smirnov test for the exponential distribution with mean unknown,'' \emph{J. Amer. Statist. Assoc.}, vol. 64, pp. 387-389, 1969.
+\bibitem{efron1993} B. Efron and R. J. Tibshirani, \emph{An Introduction to the Bootstrap}. New York: Chapman \& Hall, 1993.
+\bibitem{wald1940} A. Wald and J. Wolfowitz, ``On a test whether two samples are from the same population,'' \emph{Ann. Math. Statist.}, vol. 11, no. 2, pp. 147-162, 1940.
+\bibitem{wilks1938} S. S. Wilks, ``The large-sample distribution of the likelihood ratio for testing composite hypotheses,'' \emph{Ann. Math. Statist.}, vol. 9, no. 1, pp. 60-62, 1938.
+\bibitem{kruskal1952} W. H. Kruskal and W. A. Wallis, ``Use of ranks in one-criterion variance analysis,'' \emph{J. Amer. Statist. Assoc.}, vol. 47, pp. 583-621, 1952.
+\bibitem{mann1947} H. B. Mann and D. R. Whitney, ``On a test of whether one of two random variables is stochastically larger than the other,'' \emph{Ann. Math. Statist.}, vol. 18, no. 1, pp. 50-60, 1947.
+\bibitem{kish1965} L. Kish, \emph{Survey Sampling}. New York: Wiley, 1965.
+\bibitem{gelman2013} A. Gelman, J. B. Carlin, H. S. Stern, D. B. Dunson, A. Vehtari, and D. B. Rubin, \emph{Bayesian Data Analysis}, 3rd ed. Boca Raton, FL: CRC Press, 2013.
+\bibitem{baum1970} L. E. Baum, T. Petrie, G. Soules, and N. Weiss, ``A maximization technique occurring in the statistical analysis of probabilistic functions of Markov chains,'' \emph{Ann. Math. Statist.}, vol. 41, no. 1, pp. 164-171, 1970.
+\bibitem{numpy2020} C. R. Harris \emph{et al.}, ``Array programming with NumPy,'' \emph{Nature}, vol. 585, pp. 357-362, 2020.
+\bibitem{scipy2020} P. Virtanen \emph{et al.}, ``SciPy 1.0: Fundamental algorithms for scientific computing in Python,'' \emph{Nature Methods}, vol. 17, pp. 261-272, 2020.
+\bibitem{matplotlib2007} J. D. Hunter, ``Matplotlib: A 2D graphics environment,'' \emph{Comput. Sci. Eng.}, vol. 9, no. 3, pp. 90-95, 2007.
+\end{thebibliography}
 
 \end{document}
