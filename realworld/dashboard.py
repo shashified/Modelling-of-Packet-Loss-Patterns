@@ -7,6 +7,7 @@ import io
 import json
 import os
 import re
+import socket
 import subprocess
 import sys
 import tempfile
@@ -37,6 +38,22 @@ import study_ref as SR                           # noqa: E402
 CAPS = os.environ.get("PL_CAPTURES_DIR", os.path.join(ROOT, "realworld", "captures"))
 DEMO = os.path.join(ROOT, "realworld", "demo_captures")
 PROBE = os.path.join(ROOT, "realworld", "probe.py")
+ECHO = os.path.join(ROOT, "realworld", "echo_server.py")
+# Test network on this laptop: an echo server that drops replies on purpose (never a real measurement).
+# Bursty patterns replay the case study's Good/Bad parameters; the random one drops independently at Wi-Fi's long-run rate.
+_W, _M = C.SCENARIOS["S2_WiFi"], C.SCENARIOS["S3_Mobile"]
+_W_RATE = LM.theoretical_loss_rate(**{k: v for k, v in _W.items() if k != "label"})
+TEST_PATTERNS = {
+    "Bad moods like campus Wi-Fi (bursty)": ("testnet_wifi_bursty", (_W["p_gb"], _W["p_bg"], _W["h_g"], _W["h_b"])),
+    "Bad moods like a mobile hotspot (very bursty)": ("testnet_mobile_bursty", (_M["p_gb"], _M["p_bg"], _M["h_g"], _M["h_b"])),
+    "Random drops at the same rate (no bad moods)": ("testnet_random", (0.0, 1.0, _W_RATE, _W_RATE)),
+}
+
+
+def free_port():
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as so:
+        so.bind(("127.0.0.1", 0))
+        return so.getsockname()[1]
 ALPHA = C.ALPHA
 PALETTE = ["#2E6DB4", "#E07A1F", "#B23A48", "#2D6A4F", "#5C4D7D", "#8A6D1D", "#1D3557", "#6B7280"]
 BAD, DELIV, GOOD, GREY, NAVY = "#C0392B", "#BFE3CC", "#2D6A4F", "#9AA5B1", "#1F3A5F"
@@ -173,8 +190,13 @@ st.sidebar.markdown("**1. Record a capture**")
 with st.sidebar.form("record"):
     net = st.selectbox("Network you are on", ["Wi-Fi", "Phone hotspot", "Wired (Ethernet)", "Other"])
     other = st.text_input("Name (for Other)", placeholder="e.g. library_wifi")
-    tgt = st.selectbox("Send packets to", ["My router (recommended)", "The internet (1.1.1.1)", "Custom address"])
+    tgt = st.selectbox("Send packets to", ["My router (recommended)", "The internet (1.1.1.1)", "Custom address",
+                                           "Test network on this laptop (drops on purpose)"],
+                       help="The test network is an echo server on your own laptop that loses packets on purpose, "
+                            "so you can see bursts even when your real network is clean. It is a controlled test, not a measurement.")
     custom = st.text_input("Custom address", placeholder="e.g. 192.168.1.1")
+    pattern = st.selectbox("Test network: how it drops packets", list(TEST_PATTERNS),
+                           help="Only used with 'Test network on this laptop'.")
     dur_s = st.select_slider("Length", options=[30, 120, 300, 600, 1200], value=600, format_func=lambda s: {
         30: "30 s (quick test)", 120: "2 min", 300: "5 min", 600: "10 min (recommended)", 1200: "20 min"}[s])
     note = st.text_input("Note (optional)", placeholder="e.g. hostel room, evening")
@@ -215,14 +237,32 @@ if go:
         (re.sub(r"[^A-Za-z0-9_-]", "_", other.strip()) or "other")
     if tgt.startswith("The internet"):
         label += "_internet"
-    target = {"My router (recommended)": "gateway", "The internet (1.1.1.1)": "1.1.1.1"}.get(tgt, custom.strip())
+    testnet = tgt.startswith("Test network")
+    echo_proc = None
+    if testnet:
+        label, drop = TEST_PATTERNS[pattern]
+        port = free_port()
+        echo_proc = subprocess.Popen([sys.executable, ECHO, "--port", str(port), "--bind", "127.0.0.1",
+                                      "--test-drop", *[str(v) for v in drop]],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, cwd=ROOT)
+        import time as _time
+        _time.sleep(0.6)
+        target = "127.0.0.1"
+    else:
+        target = {"My router (recommended)": "gateway", "The internet (1.1.1.1)": "1.1.1.1"}.get(tgt, custom.strip())
     if not target:
         st.error("Type a custom address, or pick 'My router'.")
         st.stop()
     os.makedirs(CAPS, exist_ok=True)
     cmd = [sys.executable, PROBE, "--label", label, "--target", target, "--duration", str(dur_s), "--live", "--out", CAPS]
-    if note.strip():
+    if testnet:
+        cmd += ["--mode", "udp", "--port", str(port),
+                "--note", f"CONTROLLED TEST on this laptop: {pattern}. Not a real network measurement."]
+    elif note.strip():
         cmd += ["--note", note.strip()]
+    if testnet:
+        st.warning(f"🧪 Test network: packets go to an echo server on this laptop that drops them on purpose "
+                   f"({pattern.lower()}). This shows the method working; it is not a measurement of a real network.")
     st.subheader(f"Recording **{label}** for {nice_dur(dur_s)}")
     st.caption("Keep this tab open and the laptop still and plugged in. The analysis starts by itself when the recording ends.")
     ref_key = SR.match(label) if ref_choice.startswith("Matching") else \
@@ -272,6 +312,8 @@ if go:
         elif line.startswith("SAVED "):
             saved_path = line[6:].strip()
     proc.wait()
+    if echo_proc is not None:
+        echo_proc.terminate()
     if proc.returncode != 0 or not saved_path:
         st.error("The recording did not finish. Message from the probe:")
         st.code("\n".join(log[-8:]) or "(no output)")
@@ -352,6 +394,20 @@ COL = {k: PALETTE[i % len(PALETTE)] for i, k in enumerate(names)}
 color_scale = alt.Scale(domain=names, range=[COL[k] for k in names])
 full = [k for k in names if A[k]["res"]["enough_losses"]]
 
+if any(by_path[p]["label"].startswith("testnet_") or by_path[p]["meta"].get("original_label", "").startswith("testnet_") for p in chosen):
+    st.markdown('<div class="demo">🧪 Runs named <b>testnet_…</b> went through the test network on this laptop, which drops packets '
+                'on purpose. They show the method working; they are not measurements of a real network.</div>', unsafe_allow_html=True)
+thin_real = [k for k in names if verdict(A[k]["res"]) == "thin" and not k.startswith("testnet_")]
+if thin_real:
+    with st.expander(f"💡 {', '.join(thin_real)}: too few losses. How to get some", expanded=False):
+        st.markdown(
+            "Your link was very clean, which is a real result in itself. To see losses on a **real** network:\n"
+            "- Record on the **phone hotspot**, or Wi-Fi with the laptop **far from the router** (another room, behind walls).\n"
+            "- Pick **The internet (1.1.1.1)** instead of the router, so the packets cross more links.\n"
+            "- Record at a **busy time** (evening in the hostel), or start a large download or video stream at the same time.\n"
+            "- Record longer (20 min).\n\n"
+            "To show bursts on demand (for the demo), pick **Send packets to: Test network on this laptop**. "
+            "It drops packets on purpose with the case study's Good/Bad model, and is labelled as a test.")
 if any(by_path[p]["meta"].get("mode") == "demo" for p in chosen):
     st.markdown('<div class="demo">⚠️ Captures named <b>DEMO_…</b> are simulated examples for exploring the dashboard. '
                 'They are not real measurements. Switch off "Show demo data" before presenting.</div>', unsafe_allow_html=True)

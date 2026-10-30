@@ -32,6 +32,8 @@ Your browser opens the **Real Network Lab**. In the sidebar pick the network you
 
 While recording, the page shows the loss rate and the "after a loss" multiplier live, next to the case study's numbers. The sidebar's **📖 Read me** explains how the project works, every formula and every decision rule. Saved runs live in `realworld/saved_runs/`.
 
+**No losses on your network?** A clean link is a real result, but to see losses on a real network: record on the phone hotspot, sit far from the router (another room), pick "The internet (1.1.1.1)", record at a busy time or while a big download runs, or record for 20 minutes. To show bursts on demand in a demo, pick **Send packets to: Test network on this laptop**. An echo server on your own laptop then drops packets on purpose, using the case study's Good/Bad parameters (or random drops at the same rate). These runs are named `testnet_…` and are labelled as controlled tests, not measurements.
+
 If the recording reports an ICMP permission problem, run the capture once from Terminal with `sudo` (command below) and the new file appears in the dashboard by itself. Toggle **Show demo data** to explore the page before you have real captures; demo captures are clearly marked DEMO.
 
 The rest of this guide shows the same steps from the terminal.
