@@ -19,15 +19,22 @@ Too few losses for the distribution and independence tests (fewer than 10): hots
 
 | Label | Var / mean | Dispersion p | Runs z (p) | P(L given N) | P(L given L) | b/a (95% CrI) | Mean burst | Verdict |
 |---|---|---|---|---|---|---|---|---|
-| hotspot#1 | 1.28 | 0.0206 | -6.9 (< 1e-10) | 0.33% | 9.1% | 33.1 [7.7, 92.3] | 1.10 | bursty |
-| hotspot_internet#2 | 1.97 | 0.00137 | -10.6 (< 1e-10) | 0.54% | 27.3% | 50.6 [14.9, 138.9] | 1.38 | bursty |
+| hotspot#1 | 1.28 | 0.0206 | -6.9 (< 1e-10) | 0.33% | 9.1% | 33.0 [7.7, 91.5] | 1.10 | bursty |
+| hotspot_internet#2 | 1.97 | 0.00137 | -10.6 (< 1e-10) | 0.54% | 27.3% | 50.5 [14.7, 138.7] | 1.38 | bursty |
+
+Exact checks for short captures (the runs test above uses a large-sample approximation):
+
+| Label | Back-to-back losses observed | Expected if independent | Fisher exact p | Permutation runs p |
+|---|---|---|---|---|
+| hotspot#1 | 2 | 0.08 | 0.00284 | 0.0027 |
+| hotspot_internet#2 | 3 | 0.07 | 4.71e-05 | 0.0001 |
 
 ## Distribution fits
 
 | Label | AIC Poisson | AIC Neg. Bin. | Chi-square Poisson p | KS exponential p | AIC exp. | AIC two-phase | Fast share | Fast / slow mean gap |
 |---|---|---|---|---|---|---|---|---|
-| hotspot#1 | 128 | 126 | n/a | 0.0805 | 112 | 110 | 49% | 1287 ms / 8.6 s |
-| hotspot_internet#2 | 55 | 48 | n/a | 0.001 | 40 | 22 | 49% | 34 ms / 4.8 s |
+| hotspot#1 | 128 | 126 | n/a | 0.0925 | 112 | 110 | 49% | 1287 ms / 8.6 s |
+| hotspot_internet#2 | 55 | 48 | n/a | 0.0015 | 40 | 22 | 49% | 34 ms / 4.8 s |
 
 ## Interval estimates
 

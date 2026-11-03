@@ -23,14 +23,14 @@ Textbook models assume packets are lost independently (a Poisson process). This 
 
 Four captures over a mobile hotspot, 29 and 30 October 2026 (`realworld/captures/`, analysis in `realworld/results/summary.md`):
 
-| Target | Length | Lost | Loss rate [95% CrI] | b/a | Markov test p | Verdict |
+| Target | Length | Lost | Loss rate [95% CrI] | b/a | Fisher exact p | Verdict |
 |---|---|---|---|---|---|---|
-| Hotspot gateway | 120 s | 22 of 6,000 | 0.38% [0.24, 0.55] | 33 | 0.002 | bursty |
+| Hotspot gateway | 120 s | 22 of 6,000 | 0.38% [0.24, 0.55] | 33 | 0.003 | bursty |
 | Hotspot gateway | 120 s | 0 of 6,000 | 0.02% [0.00, 0.06] | n/a | n/a | too few losses |
 | 1.1.1.1 via hotspot | 30 s | 1 of 1,500 | 0.13% [0.02, 0.37] | n/a | n/a | too few losses |
-| 1.1.1.1 via hotspot | 30 s | 11 of 1,500 | 0.80% [0.41, 1.31] | 51 | 3e-5 | bursty |
+| 1.1.1.1 via hotspot | 30 s | 11 of 1,500 | 0.80% [0.41, 1.31] | 50 | 5e-5 | bursty |
 
-Both captures with enough losses reject independence, with a loss making the next one 33 and 51 times likelier (simulation: 31 to 43).
+Both captures with enough losses reject independence, with a loss making the next one about 33 and 50 times likelier (simulation: 31 to 43). The evidence rests on 2 and 3 back-to-back losses (0.08 and 0.07 expected under independence), so exact tests (Fisher, permutation runs) are reported next to the large-sample ones. These first captures are short; longer runs are planned.
 
 ## Networks studied (1 hour at 50 packets/s = 180,000 packets each)
 

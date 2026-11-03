@@ -86,6 +86,8 @@ def analyse(cap, rng):
         dispersion=HT.dispersion_test(counts),
         runs=HT.runs_test(loss),
         markov_lrt=HT.markov_lrt(loss),
+        runs_permutation=HT.runs_test_permutation(loss, 20000, rng),
+        fisher_transitions=HT.fisher_transition_test(loss),
         ks_exponential=HT.ks_exponential_bootstrap(gaps, C.N_BOOT_KS, rng) if len(gaps) >= 5 else None,
     )
     mk = BY.markov_posterior(loss, C.MARKOV_DRAWS, rng)
@@ -142,6 +144,12 @@ def write_summary(res, comparison, path):
                      f"{t['runs']['z']:.1f} ({fmt_p(t['runs']['p'])}) | {pct(t['markov_lrt']['p_L_given_N'], 2)} | "
                      f"{pct(t['markov_lrt']['p_L_given_L'], 1)} | {mk['amp_q'][1]:.1f} [{mk['amp_q'][0]:.1f}, {mk['amp_q'][2]:.1f}] | "
                      f"{d['mean_burst_len']:.2f} | {'bursty' if bursty else 'no evidence of bursts'} |")
+        L += ["", "Exact checks for short captures (the runs test above uses a large-sample approximation):", "",
+              "| Label | Back-to-back losses observed | Expected if independent | Fisher exact p | Permutation runs p |",
+              "|---|---|---|---|---|"]
+        for r in full:
+            fe, rp = r["tests"]["fisher_transitions"], r["tests"]["runs_permutation"]
+            L.append(f"| {r['label']} | {fe['n_LL']} | {fe['expected_LL']:.2f} | {fmt_p(fe['p'])} | {fmt_p(rp['p'], rp['B'])} |")
         L += ["", "## Distribution fits", "",
               "| Label | AIC Poisson | AIC Neg. Bin. | Chi-square Poisson p | KS exponential p | AIC exp. | AIC two-phase | Fast share | Fast / slow mean gap |",
               "|---|---|---|---|---|---|---|---|---|"]

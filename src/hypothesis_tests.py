@@ -151,3 +151,25 @@ def power_study(params, durations_s, reps, packet_rate, alpha, rng, simulate, wi
         for key, r in zip(out, rej):
             out[key].append(r / reps)
     return out
+
+
+# ---------- exact tests for short captures with few losses ----------
+def runs_test_permutation(loss, B, rng):
+    """Runs test with a permutation null: shuffle the 0/1 sequence B times and count how often
+    the shuffled sequence has as few runs as observed. Exact in the limit, valid for few losses."""
+    x = np.asarray(loss).astype(np.int8)
+    runs = 1 + int(np.count_nonzero(np.diff(x)))
+    if x.sum() in (0, len(x)):
+        return dict(runs=runs, p=1.0, B=B)
+    hits = sum(1 + int(np.count_nonzero(np.diff(rng.permutation(x)))) <= runs for _ in range(B))
+    return dict(runs=runs, p=(hits + 1) / (B + 1), B=B)
+
+
+def fisher_transition_test(loss):
+    """One-sided Fisher exact test on the 2x2 table of transitions: is a loss more likely after a loss?"""
+    n_nn, n_nl, n_ln, n_ll = transition_counts(loss)
+    if n_nl + n_ll == 0 or n_ln + n_ll == 0:
+        return dict(n_LL=n_ll, expected_LL=0.0, odds_ratio=float("nan"), p=1.0)
+    k, n = int(np.sum(loss)), len(loss)
+    res = stats.fisher_exact([[n_ll, n_ln], [n_nl, n_nn]], alternative="greater")
+    return dict(n_LL=n_ll, expected_LL=k * (k - 1) / n, odds_ratio=float(res.statistic), p=float(res.pvalue))
