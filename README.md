@@ -2,13 +2,35 @@
 
 # Statistical Modelling of Packet-Loss Patterns in Computer Networks
 
-*Distribution Fitting, Burstiness Testing and Bayesian Estimation* — Probability & Statistics (BAMAT207) case study.
+*Distribution Fitting, Burstiness Testing and Bayesian Estimation*
 
-**Tracks:** Track 3 (Probability Distribution Modelling) as the core; Track 1 (Bayesian Intelligence) and Track 5 (Hypothesis Testing & Comparative Analysis) as supporting components.
+**Authors:** Shashank Tiwari (25BDS0053), Kyra Panwar (25BBS0095), Aashman Biyani (25BBS0100), VIT Vellore.
 
 Textbook models assume packets are lost independently (a Poisson process). This project tests that assumption, shows how it fails (losses come in bursts), quantifies the burstiness, and shows that ignoring it makes standard 95% intervals over-confident. It then corrects them with a design-effect adjustment.
 
-**Phase 1 (this repo):** a simulation study built on the Gilbert-Elliott two-state Markov loss model. The true parameters are known, so every estimator and test can be checked against the truth. **Phase 2:** real packet captures, analysed with the same pipeline.
+- **Phase 1:** a simulation study built on the Gilbert-Elliott two-state Markov loss model. The true parameters are known, so every estimator and test can be checked against the truth.
+- **Phase 2:** real packets (50 ICMP echo requests per second) sent over a mobile hotspot, analysed with the same pipeline.
+
+## Deliverables
+
+| File | What it is |
+|---|---|
+| [`deliverables/Packet_Loss_Conference_Paper.pdf`](deliverables/Packet_Loss_Conference_Paper.pdf) | 6-page IEEE conference paper with simulated and real results (source: `paper/conference/`) |
+| [`deliverables/Team_25_IEEE_Report.pdf`](deliverables/Team_25_IEEE_Report.pdf) | Full 8-page case-study report (source: `paper/template.tex`) |
+| [`deliverables/Packet_Loss_Final_Presentation.pptx`](deliverables/Packet_Loss_Final_Presentation.pptx) / [`.pdf`](deliverables/Packet_Loss_Final_Presentation.pdf) | Final review deck |
+
+## Real-network results (Phase 2)
+
+Four captures over a mobile hotspot, 29 and 30 October 2026 (`realworld/captures/`, analysis in `realworld/results/summary.md`):
+
+| Target | Length | Lost | Loss rate [95% CrI] | b/a | Markov test p | Verdict |
+|---|---|---|---|---|---|---|
+| Hotspot gateway | 120 s | 22 of 6,000 | 0.38% [0.24, 0.55] | 33 | 0.002 | bursty |
+| Hotspot gateway | 120 s | 0 of 6,000 | 0.02% [0.00, 0.06] | n/a | n/a | too few losses |
+| 1.1.1.1 via hotspot | 30 s | 1 of 1,500 | 0.13% [0.02, 0.37] | n/a | n/a | too few losses |
+| 1.1.1.1 via hotspot | 30 s | 11 of 1,500 | 0.80% [0.41, 1.31] | 51 | 3e-5 | bursty |
+
+Both captures with enough losses reject independence, with a loss making the next one 33 and 51 times likelier (simulation: 31 to 43).
 
 ## Networks studied (1 hour at 50 packets/s = 180,000 packets each)
 
