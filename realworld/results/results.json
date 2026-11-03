@@ -1,0 +1,371 @@
+{
+  "captures": [
+    {
+      "label": "hotspot#1",
+      "file": "hotspot_20261029-142109.csv",
+      "packets": 6000,
+      "losses": 22,
+      "loss_rate": 0.0036666666666666666,
+      "duration_s": 119.98380900000001,
+      "rate": 50.0,
+      "rtt_median_ms": 6.83,
+      "rtt_p95_ms": 15.649299999999998,
+      "meta": {
+        "label": "hotspot",
+        "mode": "icmp",
+        "target": "10.23.154.194",
+        "address": "10.23.154.194",
+        "port": null,
+        "rate": 50.0,
+        "planned_duration_s": 120.0,
+        "packets_sent": 6000,
+        "packets_received": 5978,
+        "packets_lost": 22,
+        "loss_rate": 0.0036666666666666666,
+        "late_replies": 0,
+        "duplicate_replies": 0,
+        "sends_behind_schedule": 0,
+        "rtt_median_ms": 6.829959,
+        "rtt_p95_ms": 15.648875,
+        "timeout_s": 2.0,
+        "payload_bytes": 64,
+        "start_local": "2026-10-29T14:21:09.370635+05:30",
+        "platform": "Darwin 27.2.0",
+        "python": "3.15.2",
+        "note": "",
+        "loss_definition": "round trip: no reply within timeout_s of sending"
+      },
+      "posterior": {
+        "alpha": 23.0,
+        "beta": 5979.0,
+        "mean": 0.0038320559813395535,
+        "ci_low": 0.0024311037431451713,
+        "ci_high": 0.005545221465646798
+      },
+      "enough_losses": true,
+      "descriptive": {
+        "window_mean": 0.18333333333333332,
+        "window_var": 0.2350140056022409,
+        "max_losses_in_window": 2,
+        "mean_burst_len": 1.1,
+        "max_burst_len": 2,
+        "share_losses_in_bursts": 0.18181818181818182
+      },
+      "fits": {
+        "poisson_lambda": 0.18333333333333332,
+        "negbin_r": 0.4766182245142462,
+        "aic_poisson": 127.5752405402436,
+        "aic_negbin": 125.8148973543918,
+        "exp_rate": 0.20026503456131056,
+        "hyper_w_fast": 0.4923985145587071,
+        "hyper_rate_fast": 0.7767733746679428,
+        "hyper_rate_slow": 0.11643623273486199,
+        "aic_exp": 111.54077190955206,
+        "aic_hyper": 110.2609875133189
+      },
+      "tests": {
+        "chisq_poisson": {
+          "stat": 0.5746973826599776,
+          "df": 0,
+          "p": NaN,
+          "bins": 2
+        },
+        "dispersion": {
+          "D": 1.2818945760122231,
+          "stat": 152.54545454545456,
+          "df": 119,
+          "p": 0.020646768097741915
+        },
+        "runs": {
+          "runs": 41,
+          "expected": 44.83866666666667,
+          "z": -6.8607752315332275,
+          "p": 6.848785188229378e-12
+        },
+        "markov_lrt": {
+          "p_L_given_N": 0.0033461602810774638,
+          "p_L_given_L": 0.09090909090909091,
+          "G2": 9.350006790751195,
+          "df": 1,
+          "p": 0.0022298464282917425
+        },
+        "ks_exponential": {
+          "D": 0.2127696589135487,
+          "p": 0.08045977011494253,
+          "B": 2000
+        }
+      },
+      "markov": {
+        "P_b_gt_a": 0.99992,
+        "amp_q": [
+          7.726886307542808,
+          33.11330883379302,
+          92.34859026611097
+        ],
+        "burst_len_q": [
+          1.0288181851157756,
+          1.129742052628922,
+          1.3944658714090392
+        ],
+        "a_q": [
+          0.0021701359979670637,
+          0.0034573512827523545,
+          0.005169391457875629
+        ],
+        "b_q": [
+          0.0280109600827904,
+          0.11484219103018076,
+          0.28287954513219155
+        ]
+      },
+      "adjusted_posterior": {
+        "alpha": 11.60895733333333,
+        "beta": 2883.7430426666656,
+        "mean": 0.004009515020395908,
+        "ci_low": 0.0020475938098093293,
+        "ci_high": 0.006616361881414056,
+        "deff": 2.073719340059558
+      },
+      "predictive_tail": {
+        "k": 5,
+        "predicted": 2.2103331506206914e-06,
+        "observed": 0.0
+      }
+    },
+    {
+      "label": "hotspot#2",
+      "file": "hotspot_20261030-110608.csv",
+      "packets": 6000,
+      "losses": 0,
+      "loss_rate": 0.0,
+      "duration_s": 119.98416599999999,
+      "rate": 50.0,
+      "rtt_median_ms": 3.661,
+      "rtt_p95_ms": 4.37415,
+      "meta": {
+        "label": "hotspot",
+        "mode": "icmp",
+        "target": "172.20.10.1",
+        "address": "172.20.10.1",
+        "port": null,
+        "rate": 50.0,
+        "planned_duration_s": 120.0,
+        "packets_sent": 6000,
+        "packets_received": 6000,
+        "packets_lost": 0,
+        "loss_rate": 0.0,
+        "late_replies": 0,
+        "duplicate_replies": 0,
+        "sends_behind_schedule": 0,
+        "rtt_median_ms": 3.660834,
+        "rtt_p95_ms": 4.374,
+        "timeout_s": 2.0,
+        "payload_bytes": 64,
+        "start_local": "2026-10-30T11:06:08.441726+05:30",
+        "platform": "Darwin 27.2.0",
+        "python": "3.15.2",
+        "note": "",
+        "loss_definition": "round trip: no reply within timeout_s of sending"
+      },
+      "posterior": {
+        "alpha": 1.0,
+        "beta": 6001.0,
+        "mean": 0.00016661112962345885,
+        "ci_low": 4.2189226091178245e-06,
+        "ci_high": 0.0006145218945833317
+      },
+      "enough_losses": false
+    },
+    {
+      "label": "hotspot_internet#1",
+      "file": "hotspot_internet_20261030-113339.csv",
+      "packets": 1500,
+      "losses": 1,
+      "loss_rate": 0.0006666666666666666,
+      "duration_s": 29.984566,
+      "rate": 50.0,
+      "rtt_median_ms": 50.107,
+      "rtt_p95_ms": 234.15659999999983,
+      "meta": {
+        "label": "hotspot_internet",
+        "mode": "icmp",
+        "target": "1.1.1.1",
+        "address": "1.1.1.1",
+        "port": null,
+        "rate": 50.0,
+        "planned_duration_s": 30.0,
+        "packets_sent": 1500,
+        "packets_received": 1499,
+        "packets_lost": 1,
+        "loss_rate": 0.0006666666666666666,
+        "late_replies": 0,
+        "duplicate_replies": 1,
+        "sends_behind_schedule": 0,
+        "rtt_median_ms": 50.107375,
+        "rtt_p95_ms": 233.986708,
+        "timeout_s": 2.0,
+        "payload_bytes": 64,
+        "start_local": "2026-10-30T11:33:39.042945+05:30",
+        "platform": "Darwin 27.2.0",
+        "python": "3.15.2",
+        "note": "",
+        "loss_definition": "round trip: no reply within timeout_s of sending"
+      },
+      "posterior": {
+        "alpha": 2.0,
+        "beta": 1500.0,
+        "mean": 0.0013315579227696406,
+        "ci_low": 0.0001614060283444542,
+        "ci_high": 0.0037063064141633537
+      },
+      "enough_losses": false
+    },
+    {
+      "label": "hotspot_internet#2",
+      "file": "hotspot_internet_20261030-115651.csv",
+      "packets": 1500,
+      "losses": 11,
+      "loss_rate": 0.007333333333333333,
+      "duration_s": 29.983342,
+      "rate": 50.0,
+      "rtt_median_ms": 131.198,
+      "rtt_p95_ms": 912.5615999999997,
+      "meta": {
+        "label": "hotspot_internet",
+        "mode": "icmp",
+        "target": "1.1.1.1",
+        "address": "1.1.1.1",
+        "port": null,
+        "rate": 50.0,
+        "planned_duration_s": 30.0,
+        "packets_sent": 1500,
+        "packets_received": 1489,
+        "packets_lost": 11,
+        "loss_rate": 0.007333333333333333,
+        "late_replies": 0,
+        "duplicate_replies": 0,
+        "sends_behind_schedule": 0,
+        "rtt_median_ms": 131.19775,
+        "rtt_p95_ms": 910.284375,
+        "timeout_s": 2.0,
+        "payload_bytes": 64,
+        "start_local": "2026-10-30T11:56:51.766497+05:30",
+        "platform": "Darwin 27.2.0",
+        "python": "3.15.2",
+        "note": "",
+        "loss_definition": "round trip: no reply within timeout_s of sending"
+      },
+      "posterior": {
+        "alpha": 12.0,
+        "beta": 1490.0,
+        "mean": 0.007989347536617843,
+        "ci_low": 0.004137588017040018,
+        "ci_high": 0.013074703332641326
+      },
+      "enough_losses": true,
+      "descriptive": {
+        "window_mean": 0.36666666666666664,
+        "window_var": 0.7229885057471264,
+        "max_losses_in_window": 3,
+        "mean_burst_len": 1.375,
+        "max_burst_len": 2,
+        "share_losses_in_bursts": 0.5454545454545454
+      },
+      "fits": {
+        "poisson_lambda": 0.36666666666666664,
+        "negbin_r": 0.1642753930947259,
+        "aic_poisson": 55.20134277793893,
+        "aic_negbin": 47.832813530490675,
+        "exp_rate": 0.4048822646911327,
+        "hyper_w_fast": 0.4864634575361392,
+        "hyper_rate_fast": 29.258063273246265,
+        "hyper_rate_slow": 0.20933102000113316,
+        "aic_exp": 40.08317917209342,
+        "aic_hyper": 21.916775365132047
+      },
+      "tests": {
+        "chisq_poisson": {
+          "stat": 2.775568083805388,
+          "df": 0,
+          "p": NaN,
+          "bins": 2
+        },
+        "dispersion": {
+          "D": 1.9717868338557993,
+          "stat": 57.18181818181818,
+          "df": 29,
+          "p": 0.0013662357573613975
+        },
+        "runs": {
+          "runs": 17,
+          "expected": 22.838666666666665,
+          "z": -10.596598381286471,
+          "p": 3.0901628649619326e-26
+        },
+        "markov_lrt": {
+          "p_L_given_N": 0.005376344086021506,
+          "p_L_given_L": 0.2727272727272727,
+          "G2": 17.581745959021703,
+          "df": 1,
+          "p": 2.7521751017493494e-05
+        },
+        "ks_exponential": {
+          "D": 0.4673470867781629,
+          "p": 0.0009995002498750624,
+          "B": 2000
+        }
+      },
+      "markov": {
+        "P_b_gt_a": 1.0,
+        "amp_q": [
+          14.911356287599972,
+          50.62045412141305,
+          138.92771182889106
+        ],
+        "burst_len_q": [
+          1.1106471933966557,
+          1.4234484787535462,
+          2.337715692820311
+        ],
+        "a_q": [
+          0.0027598480170181296,
+          0.005826090260486575,
+          0.010553403812655855
+        ],
+        "b_q": [
+          0.09962406968981112,
+          0.2974807202884833,
+          0.5722319855730982
+        ]
+      },
+      "adjusted_posterior": {
+        "alpha": 12.0,
+        "beta": 1490.0,
+        "mean": 0.007989347536617843,
+        "ci_low": 0.004137588017040018,
+        "ci_high": 0.013074703332641326,
+        "deff": 1.0
+      },
+      "predictive_tail": {
+        "k": 5,
+        "predicted": 9.507941415165533e-05,
+        "observed": 0.0
+      }
+    }
+  ],
+  "comparison": {
+    "kruskal_H": 0.3508461137378599,
+    "kruskal_p": 0.553634555985968,
+    "chi2_homog": 2.8934128346542973,
+    "chi2_df": 1,
+    "chi2_p": 0.08894233395736308,
+    "pairwise": [
+      {
+        "a": "hotspot#1",
+        "b": "hotspot_internet#2",
+        "U": 1722.5,
+        "p_bonf": 0.5561959240234896
+      }
+    ]
+  }
+}
